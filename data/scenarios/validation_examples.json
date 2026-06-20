@@ -1,0 +1,30 @@
+[
+  {
+    "name": "overfitting",
+    "description": "High training accuracy, low validation accuracy – classic overfitting.",
+    "symptoms": ["TrainingAccuracyHigh", "ValidationAccuracyLow"],
+    "expected_causes": ["OverfittingObserved", "ModelTooComplex", "InsufficientRegularization"],
+    "expected_recommendations": ["AddDropout", "UseEarlyStopping", "IncreaseDatasetSize"]
+  },
+  {
+    "name": "underfitting",
+    "description": "Both training and validation accuracy are low – underfitting.",
+    "symptoms": ["TrainingAccuracyLow", "ValidationAccuracyLow"],
+    "expected_causes": ["UnderfittingObserved", "ModelTooSimple"],
+    "expected_recommendations": ["IncreaseModelComplexity"]
+  },
+  {
+    "name": "overfitting_small_dataset",
+    "description": "Overfitting on a small dataset – needs augmentation and regularisation.",
+    "symptoms": ["TrainingAccuracyHigh", "ValidationAccuracyLow", "SmallDataset"],
+    "expected_causes": ["OverfittingObserved", "ModelTooComplex", "InsufficientRegularization"],
+    "expected_recommendations": ["AddDropout", "UseEarlyStopping", "ApplyDataAugmentation"]
+  },
+  {
+    "name": "high_val_loss_small_data",
+    "description": "Validation loss is high on a small dataset.",
+    "symptoms": ["ValidationLossHigh", "SmallDataset"],
+    "expected_causes": ["InsufficientRegularization"],
+    "expected_recommendations": ["AddDropout", "UseEarlyStopping"]
+  }
+]

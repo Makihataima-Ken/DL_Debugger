@@ -1,0 +1,17 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# uv specific ignores
+uv.lock
+pyproject.toml
+
+# extension specific ignores
+dl_debugger-output.*

@@ -1,0 +1,30 @@
+[
+  {
+    "name": "distribution_shift",
+    "description": "High validation accuracy but low test accuracy – distribution shift.",
+    "symptoms": ["ValidationAccuracyHigh", "TestAccuracyLow"],
+    "expected_causes": ["DistributionShift", "PoorGeneralization"],
+    "expected_recommendations": ["CollectDomainData", "ApplyDataAugmentation", "InspectDataPipeline"]
+  },
+  {
+    "name": "data_leakage",
+    "description": "Data leakage is suspected and test accuracy is low.",
+    "symptoms": ["DataLeakageSuspected", "TestAccuracyLow"],
+    "expected_causes": ["DistributionShift"],
+    "expected_recommendations": ["CollectDomainData", "InspectDataPipeline"]
+  },
+  {
+    "name": "imbalanced_test_set",
+    "description": "Class imbalance in the test set leads to low aggregate accuracy.",
+    "symptoms": ["ClassImbalanceDetected", "TestAccuracyLow"],
+    "expected_causes": ["DataImbalance"],
+    "expected_recommendations": ["RebalanceClasses", "UseWeightedLoss"]
+  },
+  {
+    "name": "poor_generalisation",
+    "description": "High validation loss and low test accuracy – broad generalisation failure.",
+    "symptoms": ["ValidationLossHigh", "TestAccuracyLow"],
+    "expected_causes": ["PoorGeneralization"],
+    "expected_recommendations": ["InspectDataPipeline"]
+  }
+]

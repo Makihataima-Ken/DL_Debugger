@@ -1,0 +1,44 @@
+[
+  {
+    "name": "oscillating_loss",
+    "description": "Training loss is high and oscillating – suspected high LR.",
+    "symptoms": ["TrainingLossHigh", "OscillatingLoss"],
+    "expected_causes": ["LearningRateTooHigh"],
+    "expected_recommendations": ["ReduceLearningRate"]
+  },
+  {
+    "name": "slow_convergence",
+    "description": "Training loss is high but decreasing very slowly – suspected low LR.",
+    "symptoms": ["TrainingLossHigh", "SlowConvergence"],
+    "expected_causes": ["LearningRateTooLow"],
+    "expected_recommendations": ["IncreaseLearningRate"]
+  },
+  {
+    "name": "gradient_explosion",
+    "description": "Gradients are exploding during back-propagation.",
+    "symptoms": ["GradientExplosion"],
+    "expected_causes": ["BadWeightInitialization", "LearningRateTooHigh"],
+    "expected_recommendations": ["UseProperInitialization", "UseWeightClipping", "ReduceLearningRate"]
+  },
+  {
+    "name": "gradient_vanishing",
+    "description": "Gradients are vanishing in early layers.",
+    "symptoms": ["GradientVanishing"],
+    "expected_causes": ["BadWeightInitialization"],
+    "expected_recommendations": ["UseProperInitialization", "AddBatchNormalization"]
+  },
+  {
+    "name": "noisy_labels",
+    "description": "Dataset has significant label noise causing high training loss.",
+    "symptoms": ["NoisyLabels", "TrainingLossHigh"],
+    "expected_causes": ["PoorDataQuality"],
+    "expected_recommendations": ["ImproveLabelQuality"]
+  },
+  {
+    "name": "class_imbalance",
+    "description": "Severe class imbalance observed in the training dataset.",
+    "symptoms": ["ClassImbalanceDetected"],
+    "expected_causes": ["DataImbalance"],
+    "expected_recommendations": ["RebalanceClasses", "UseWeightedLoss"]
+  }
+]
