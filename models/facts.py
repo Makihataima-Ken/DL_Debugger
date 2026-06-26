@@ -39,6 +39,11 @@ class TrainingAccuracyLow(Fact):
     pass
 
 
+class NaNLoss(Fact):
+    """Loss became NaN/Inf during training (numerical blow-up)."""
+    pass
+
+
 class ValidationAccuracyHigh(Fact):
     """Validation accuracy is high."""
     pass
@@ -114,6 +119,50 @@ class PoorGeneralization(Fact):
     pass
 
 
+class DeadReLUDetected(Fact):
+    """A large fraction of ReLU units output zero for all inputs."""
+    pass
+
+
+class AttentionCollapse(Fact):
+    """Attention weights collapse onto a single token / become uniform."""
+    pass
+
+
+class TokenizationIssue(Fact):
+    """Suspected tokenization/vocabulary mismatch or excessive <unk>."""
+    pass
+
+
+class ContextLengthExceeded(Fact):
+    """Inputs exceed the model's maximum context/sequence length."""
+    pass
+
+
+class FeatureCollapse(Fact):
+    """CNN feature maps collapse to near-constant / redundant features."""
+    pass
+
+
+class ReceptiveFieldTooSmall(Fact):
+    """Effective receptive field is too small for the target structures."""
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Model-type Facts (set by the NLP layer; never diagnostic on their own)
+# ---------------------------------------------------------------------------
+
+class ModelIsTransformer(Fact):
+    """The model under analysis is a Transformer/attention architecture."""
+    pass
+
+
+class ModelIsCNN(Fact):
+    """The model under analysis is a convolutional neural network."""
+    pass
+
+
 # ---------------------------------------------------------------------------
 # Cause Facts
 # ---------------------------------------------------------------------------
@@ -165,6 +214,31 @@ class DistributionShift(Fact):
 
 class DataImbalance(Fact):
     """The dataset has a severe class imbalance."""
+    pass
+
+
+class BatchSizeTooLarge(Fact):
+    """Batch size is so large that gradient estimates over-smooth / generalise poorly."""
+    pass
+
+
+class BatchSizeTooSmall(Fact):
+    """Batch size is so small that gradient noise destabilises training."""
+    pass
+
+
+class MomentumTooHigh(Fact):
+    """Momentum coefficient is too high, amplifying oscillation/overshoot."""
+    pass
+
+
+class WeightDecayTooHigh(Fact):
+    """Weight decay (L2) is too strong, suppressing model capacity."""
+    pass
+
+
+class NumericalInstability(Fact):
+    """Training is numerically unstable (overflow / NaN propagation)."""
     pass
 
 
@@ -262,6 +336,51 @@ class ReduceRegularization(Fact):
     pass
 
 
+class ReduceBatchSize(Fact):
+    """Recommendation: reduce the batch size."""
+    pass
+
+
+class IncreaseBatchSize(Fact):
+    """Recommendation: increase the batch size."""
+    pass
+
+
+class ReduceMomentum(Fact):
+    """Recommendation: lower the optimiser momentum / beta1."""
+    pass
+
+
+class ReduceWeightDecay(Fact):
+    """Recommendation: lower the weight-decay coefficient."""
+    pass
+
+
+class UseLeakyReLU(Fact):
+    """Recommendation: switch dead ReLUs to LeakyReLU/GELU/ELU."""
+    pass
+
+
+class UseGradientClipping(Fact):
+    """Recommendation: clip gradients to bound numerical instability."""
+    pass
+
+
+class TruncateOrChunkInput(Fact):
+    """Recommendation: truncate/chunk sequences to fit context length."""
+    pass
+
+
+class FixTokenizer(Fact):
+    """Recommendation: audit tokenizer/vocabulary coverage."""
+    pass
+
+
+class IncreaseReceptiveField(Fact):
+    """Recommendation: add depth/dilation/pooling to widen receptive field."""
+    pass
+
+
 # ---------------------------------------------------------------------------
 # Explanation Fact
 # ---------------------------------------------------------------------------
@@ -280,9 +399,12 @@ class Explanation(Fact):
         Name of the fact that was derived.
     explanation : str
         Human-readable rationale.
+    confidence : float
+        Rule-assigned confidence in the derived fact, in [0.0, 1.0].
     """
 
     rule_id: str = Field(str, mandatory=True)
     triggered_by: str = Field(str, mandatory=True)
     derived: str = Field(str, mandatory=True)
     explanation: str = Field(str, mandatory=True)
+    confidence: float = Field(float, default=0.8)

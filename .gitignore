@@ -15,3 +15,6 @@ pyproject.toml
 
 # extension specific ignores
 dl_debugger-output.*
+
+
+*.diff
