@@ -13,6 +13,7 @@ Usage
     python main.py --file data/scenarios/training_examples.json
     python main.py --list
     python main.py --symptoms TrainingLossHigh,OscillatingLoss
+    python main.py --text "my training loss keeps oscillating and never converges"
 """
 
 from __future__ import annotations
@@ -40,6 +41,7 @@ def _print_result(
     causes: list[str],
     recommendations: list[str],
     explanations: list[dict[str, str]],
+    confidence: dict[str, float] | None = None,
 ) -> None:
     """Pretty-print the full diagnosis to stdout."""
     print(banner(f"DL Debugging Expert System -- {scenario_label}"))
@@ -49,9 +51,15 @@ def _print_result(
         [normalise_fact_name(s) for s in symptoms],
     ))
 
+    conf = confidence or {}
+    cause_lines = [
+        f"{normalise_fact_name(c)}"
+        + (f"  (confidence {conf[c]:.2f})" if c in conf else "")
+        for c in causes
+    ]
     print(format_section(
         "DERIVED CAUSES",
-        [normalise_fact_name(c) for c in causes],
+        cause_lines,
     ))
 
     print(format_section(
@@ -90,6 +98,7 @@ def _execute_scenario(symptom_names: list[str], label: str) -> None:
         causes=result.causes,
         recommendations=result.recommendations,
         explanations=result.explanations,
+        confidence=result.confidence,
     )
 
 
@@ -117,6 +126,29 @@ def _run_custom(symptom_str: str) -> None:
         sys.exit(1)
 
     _execute_scenario(raw_names, label="custom")
+
+
+def _run_text(text: str) -> None:
+    """Natural-language entry point: text -> facts -> diagnosis."""
+    engine = DebuggingKnowledgeEngine()
+    result = engine.run_text(text)
+    extraction = result.extraction
+
+    if extraction is not None and not extraction.all_fact_names:
+        print(
+            "[INFO] No known symptoms were recognised in the text.\n"
+            "       Try describing loss, accuracy, gradients, or the model type.",
+            file=sys.stderr,
+        )
+
+    _print_result(
+        scenario_label="natural-language",
+        symptoms=result.symptoms,
+        causes=result.causes,
+        recommendations=result.recommendations,
+        explanations=result.explanations,
+        confidence=result.confidence,
+    )
 
 
 def _list_scenarios() -> None:
@@ -204,6 +236,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Path to a JSON scenario file with cases to choose from.",
     )
     parser.add_argument(
+        "--text",
+        metavar="TEXT",
+        help="Describe the problem in natural language (e.g. 'my training loss oscillates').",
+    )
+    parser.add_argument(
         "--list",
         action="store_true",
         dest="list_scenarios",
@@ -224,6 +261,10 @@ def main() -> None:
 
     if args.list_scenarios:
         _list_scenarios()
+        return
+
+    if args.text:
+        _run_text(args.text)
         return
 
     if args.scenario:

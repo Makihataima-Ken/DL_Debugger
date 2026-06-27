@@ -1,6 +1,6 @@
 # Knowledge-Based Expert System for Systematic Debugging of Deep Learning Model Outputs
 
-A pure Experta rule-based expert system that helps AI students and developers diagnose problems in deep learning model training, validation, and testing. All reasoning emerges exclusively from Experta rule activation — no procedural decision logic exists outside rules.
+A hybrid **NLP-powered, explainable, knowledge-based expert system** that helps AI students and developers diagnose problems in deep learning model training, validation, and testing. Users describe problems in **plain English**; an NLP layer converts the text into Experta facts, and **all reasoning still emerges exclusively from Experta rule activation** — no procedural decision logic exists outside rules.
 
 ---
 
@@ -11,14 +11,23 @@ dl_debugger/
 ├── main.py                          # CLI entry point
 │
 ├── engine/
+│   ├── nlp/                         # NLP preprocessing (NO diagnosis)
+│   │   ├── training_debugging_vocabulary.py  # phrase -> Fact-name vocabulary
+│   │   ├── terminology_normalizer.py         # normalise + synonym expansion
+│   │   ├── entity_mapper.py                  # text -> Fact names + lexical conf.
+│   │   ├── intent_detector.py                # coarse routing intent
+│   │   └── symptom_extractor.py              # façade: text -> ExtractionResult
 │   ├── knowledge_engine.py          # DebuggingKnowledgeEngine + DiagnosisResult
 │   └── rules/
 │       ├── training_rules.py        # TRAIN_001–TRAIN_012
 │       ├── validation_rules.py      # VAL_001–VAL_008
 │       ├── testing_rules.py         # TEST_001–TEST_006
-│       ├── optimization_rules.py    # OPT_001–OPT_006
-│       ├── architecture_rules.py    # ARCH_001–ARCH_008
-│       └── recommendation_rules.py # REC_001–REC_016
+│       ├── optimization_rules.py    # OPT_001–OPT_009
+│       ├── architecture_rules.py    # ARCH_001–ARCH_009
+│       ├── recommendation_rules.py # REC_001–REC_016
+│       ├── data_rules.py            # DATA_001–DATA_005
+│       ├── transformer_rules.py     # TF_001–TF_004 (gated on ModelIsTransformer)
+│       └── cnn_rules.py             # CNN_001–CNN_003 (gated on ModelIsCNN)
 │
 ├── models/
 │   └── facts.py                     # All Experta Fact subclasses
@@ -36,7 +45,10 @@ dl_debugger/
 ├── tests/
 │   ├── test_training.py
 │   ├── test_validation.py
-│   └── test_testing.py
+│   ├── test_testing.py
+│   ├── test_nlp.py                  # NLP extraction tests
+│   ├── test_new_rules.py            # data/transformer/cnn/opt/arch rules
+│   └── test_end_to_end.py           # text -> diagnosis pipeline
 │
 ├── requirements.txt
 └── README.md
