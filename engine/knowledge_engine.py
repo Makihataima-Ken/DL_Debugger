@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib
 from typing import TYPE_CHECKING
+from collections import defaultdict
 
 from experta import KnowledgeEngine, DefFacts, Fact
 
@@ -33,6 +34,15 @@ from models.facts import (
     LargeDataset,
     NoisyLabels,
     PoorGeneralization,
+    NaNLoss,
+    DeadReLUDetected,
+    AttentionCollapse,
+    TokenizationIssue,
+    ContextLengthExceeded,
+    FeatureCollapse,
+    ReceptiveFieldTooSmall,
+    ModelIsTransformer,
+    ModelIsCNN,
     # Cause facts
     LearningRateTooHigh,
     LearningRateTooLow,
@@ -44,6 +54,11 @@ from models.facts import (
     PoorDataQuality,
     DistributionShift,
     DataImbalance,
+    BatchSizeTooLarge,
+    BatchSizeTooSmall,
+    MomentumTooHigh,
+    WeightDecayTooHigh,
+    NumericalInstability,
     # Recommendation facts
     ReduceLearningRate,
     IncreaseLearningRate,
@@ -63,6 +78,15 @@ from models.facts import (
     InspectDataPipeline,
     CollectDomainData,
     ReduceRegularization,
+    ReduceBatchSize,
+    IncreaseBatchSize,
+    ReduceMomentum,
+    ReduceWeightDecay,
+    UseLeakyReLU,
+    UseGradientClipping,
+    TruncateOrChunkInput,
+    FixTokenizer,
+    IncreaseReceptiveField,
     # XAI
     Explanation,
 )
@@ -73,6 +97,9 @@ from engine.rules.testing_rules import TestingRules
 from engine.rules.optimization_rules import OptimizationRules
 from engine.rules.architecture_rules import ArchitectureRules
 from engine.rules.recommendation_rules import RecommendationRules
+from engine.rules.data_rules import DataRules
+from engine.rules.transformer_rules import TransformerRules
+from engine.rules.cnn_rules import CNNRules
 
 
 # ---------------------------------------------------------------------------
@@ -99,6 +126,15 @@ SYMPTOM_FACT_CLASSES: set[type] = {
     LargeDataset,
     NoisyLabels,
     PoorGeneralization,
+    NaNLoss,
+    DeadReLUDetected,
+    AttentionCollapse,
+    TokenizationIssue,
+    ContextLengthExceeded,
+    FeatureCollapse,
+    ReceptiveFieldTooSmall,
+    ModelIsTransformer,
+    ModelIsCNN,
 }
 
 CAUSE_FACT_CLASSES: set[type] = {
@@ -112,6 +148,11 @@ CAUSE_FACT_CLASSES: set[type] = {
     PoorDataQuality,
     DistributionShift,
     DataImbalance,
+    BatchSizeTooLarge,
+    BatchSizeTooSmall,
+    MomentumTooHigh,
+    WeightDecayTooHigh,
+    NumericalInstability,
 }
 
 RECOMMENDATION_FACT_CLASSES: set[type] = {
@@ -133,6 +174,15 @@ RECOMMENDATION_FACT_CLASSES: set[type] = {
     InspectDataPipeline,
     CollectDomainData,
     ReduceRegularization,
+    ReduceBatchSize,
+    IncreaseBatchSize,
+    ReduceMomentum,
+    ReduceWeightDecay,
+    UseLeakyReLU,
+    UseGradientClipping,
+    TruncateOrChunkInput,
+    FixTokenizer,
+    IncreaseReceptiveField,
 }
 
 # Mapping: string name → Fact class (for dynamic symptom injection)
@@ -157,6 +207,9 @@ class DebuggingKnowledgeEngine(
     OptimizationRules,
     ArchitectureRules,
     RecommendationRules,
+    DataRules,
+    TransformerRules,
+    CNNRules,
 ):
     """
     Central expert-system engine that combines all rule modules via multiple
@@ -195,6 +248,7 @@ class DebuggingKnowledgeEngine(
         causes: list[str] = []
         recommendations: list[str] = []
         explanations: list[dict[str, str]] = []
+        confidence_by_fact: dict[str, list[float]] = defaultdict(list)
 
         for fact in self.facts.values():
             fact_type = type(fact)
@@ -209,6 +263,7 @@ class DebuggingKnowledgeEngine(
                         "triggered_by": fact["triggered_by"],
                         "derived": fact["derived"],
                         "explanation": fact["explanation"],
+                        "confidence": float(fact.get("confidence", 0.8)),
                     }
                 )
             elif name in self._injected_symptoms:
@@ -216,11 +271,30 @@ class DebuggingKnowledgeEngine(
             elif fact_type in SYMPTOM_FACT_CLASSES or fact_type in CAUSE_FACT_CLASSES:
                 causes.append(name)
 
+        # ---- Confidence aggregation (REPORTING ONLY; not diagnostic logic) ----
+        # Each Explanation already encodes the rule-assigned confidence in its
+        # derived fact. We aggregate evidence using a noisy-OR combination so
+        # that multiple rules supporting the same conclusion reinforce it.
+        for exp in explanations:
+            confidence_by_fact[exp["derived"]].append(exp["confidence"])
+
+        def _noisy_or(values: list[float]) -> float:
+            acc = 1.0
+            for v in values:
+                acc *= (1.0 - max(0.0, min(1.0, v)))
+            return round(1.0 - acc, 3)
+
+        confidence = {
+            fact_name: _noisy_or(vals)
+            for fact_name, vals in confidence_by_fact.items()
+        }
+
         return DiagnosisResult(
             symptoms=sorted(set(symptoms)),
             causes=sorted(set(causes)),
             recommendations=sorted(set(recommendations)),
             explanations=sorted(explanations, key=lambda x: x["rule_id"]),
+            confidence=confidence,
         )
 
     def inject_symptoms(self, symptom_names: list[str]) -> None:
@@ -265,6 +339,31 @@ class DebuggingKnowledgeEngine(
         self.run()
         return self.get_diagnosis()
 
+    def run_text(self, text: str) -> "DiagnosisResult":
+        """Natural-language entry point.
+
+        Uses the NLP layer to convert *text* into symptom/model-type Fact
+        names, then runs the standard rule-driven inference. The NLP layer
+        performs NO diagnosis; all reasoning still happens in Experta rules.
+
+        Parameters
+        ----------
+        text:
+            Free-text description of the neural-network problem.
+
+        Returns
+        -------
+        DiagnosisResult
+            Final inference result, with an attached ``extraction`` record.
+        """
+        # Imported lazily to avoid a hard dependency for pure-symptom usage.
+        from engine.nlp.symptom_extractor import SymptomExtractor
+
+        extraction = SymptomExtractor().extract(text)
+        result = self.run_scenario(extraction.all_fact_names)
+        result.extraction = extraction
+        return result
+
 
 # ---------------------------------------------------------------------------
 # Result container
@@ -285,6 +384,8 @@ class DiagnosisResult:
     explanations : list[dict[str, str]]
         Ordered list of XAI explanation records, each with keys
         ``rule_id``, ``triggered_by``, ``derived``, ``explanation``.
+    confidence : dict[str, float]
+        Aggregated confidence per derived fact (noisy-OR over rule evidence).
     """
 
     def __init__(
@@ -293,11 +394,15 @@ class DiagnosisResult:
         causes: list[str],
         recommendations: list[str],
         explanations: list[dict[str, str]],
+        confidence: dict[str, float] | None = None,
     ) -> None:
         self.symptoms = symptoms
         self.causes = causes
         self.recommendations = recommendations
         self.explanations = explanations
+        self.confidence = confidence or {}
+        # Optional NLP provenance (set by run_text); None for symptom-only runs.
+        self.extraction = None
 
     def __repr__(self) -> str:  # pragma: no cover
         return (
