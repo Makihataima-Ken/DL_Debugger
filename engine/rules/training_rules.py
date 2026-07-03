@@ -143,6 +143,7 @@ class TrainingRules(KnowledgeEngine):
     @Rule(
         NoisyLabels(),
         NOT(PoorDataQuality()),
+        salience=1,
     )
     def train_005_noisy_labels(self) -> None:
         """Noisy labels are a direct indicator of poor data quality."""

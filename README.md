@@ -24,10 +24,13 @@ dl_debugger/
 │       ├── testing_rules.py         # TEST_001–TEST_006
 │       ├── optimization_rules.py    # OPT_001–OPT_009
 │       ├── architecture_rules.py    # ARCH_001–ARCH_009
-│       ├── recommendation_rules.py # REC_001–REC_016
+│       ├── recommendation_rules.py # REC_001–REC_020
 │       ├── data_rules.py            # DATA_001–DATA_005
-│       ├── transformer_rules.py     # TF_001–TF_004 (gated on ModelIsTransformer)
-│       └── cnn_rules.py             # CNN_001–CNN_003 (gated on ModelIsCNN)
+│       ├── mixed_precision_rules.py # AMP_001–AMP_007 (gated on UsesMixedPrecision)
+│       ├── distributed_rules.py     # DIST_001–DIST_010 (gated on UsesDistributedTraining)
+│       ├── optimizer_rules.py       # OPTZ_001–OPTZ_006 (gated on optimizer context)
+│       ├── transformer_rules.py     # TF_001–TF_017 (gated on ModelIsTransformer)
+│       └── cnn_rules.py             # CNN_001–CNN_011 (gated on ModelIsCNN)
 │
 ├── models/
 │   └── facts.py                     # All Experta Fact subclasses
@@ -113,6 +116,45 @@ Observable problems the user reports:
 | `LargeDataset` | Large dataset |
 | `NoisyLabels` | Significant label noise |
 | `PoorGeneralization` | Poor transfer to unseen data |
+| `NaNLoss` | Loss becomes NaN or Inf |
+| `DeadReLUDetected` | ReLU units stop activating |
+| `AttentionCollapse` | Attention collapses or becomes uniform |
+| `TokenizationIssue` | Tokenizer/vocabulary mismatch |
+| `ContextLengthExceeded` | Input exceeds sequence/context length |
+| `FeatureCollapse` | CNN features collapse or become redundant |
+| `ReceptiveFieldTooSmall` | CNN receptive field is too small |
+| `MixedPrecisionOverflow` | AMP/fp16 overflow observed |
+| `LossScaleOverflow` | AMP loss scaler overflows or skips steps |
+| `GradientUnderflow` | Gradients underflow under reduced precision |
+| `MultiGpuThroughputLow` | Distributed throughput is poor |
+| `GpuUnderutilization` | GPUs are idle or underused |
+| `BatchNormDesync` | BatchNorm stats desynchronize across workers |
+| `GradientSyncSlow` | Gradient synchronization is slow |
+| `PerDeviceBatchTooSmallObserved` | Per-device batch is too small |
+| `CoupledWeightDecayUsed` | Adam uses coupled L2 weight decay |
+| `MissingMomentum` | SGD momentum is missing or too weak |
+| `AdamHighLearningRateInstability` | Adam is unstable at the current LR |
+| `WarmupMissing` | LR warmup is missing |
+| `AttentionEntropyCollapse` | Attention entropy collapses |
+| `PositionalEncodingProblem` | Positional encodings appear wrong |
+| `LongSequenceMemoryBlowup` | Long sequences exhaust memory |
+| `RepetitiveGeneration` | Generated text is repetitive or degenerate |
+| `BatchNormTrainEvalMismatch` | CNN train/eval behavior diverges |
+| `AggressivePoolingOrStride` | CNN stride/pooling removes too much detail |
+| `InsufficientSpatialAugmentation` | Spatial augmentation is missing or weak |
+| `ChannelCollapse` | CNN channels become redundant |
+
+### Context Facts
+Injectable facts that gate specialized rule modules. They are treated like input symptoms in reports and are never diagnosed causes:
+
+| Fact Class | Meaning |
+|---|---|
+| `ModelIsTransformer` | Enables Transformer-specific rules |
+| `ModelIsCNN` | Enables CNN-specific rules |
+| `UsesMixedPrecision` | Enables AMP/mixed-precision rules |
+| `UsesDistributedTraining` | Enables distributed-training rules |
+| `OptimizerIsAdam` | Enables Adam-specific optimizer rules |
+| `OptimizerIsSGD` | Enables SGD-specific optimizer rules |
 
 ### Cause Facts
 Inferred root causes:
@@ -129,6 +171,31 @@ Inferred root causes:
 | `PoorDataQuality` | Noisy, mislabelled, or corrupted data |
 | `DistributionShift` | Test distribution differs from train |
 | `DataImbalance` | Severe class imbalance |
+| `BatchSizeTooLarge` | Batch is too large |
+| `BatchSizeTooSmall` | Batch is too small |
+| `MomentumTooHigh` | Momentum is too high |
+| `WeightDecayTooHigh` | Weight decay is too high |
+| `NumericalInstability` | Overflow, NaN, or invalid numeric values |
+| `LossScalingMisconfigured` | AMP loss scaling is misconfigured |
+| `Fp16RangeExceeded` | Values exceed fp16 numeric range |
+| `Fp16GradientUnderflow` | fp16 causes gradients to underflow |
+| `DataLoadingBottleneck` | Input pipeline limits multi-GPU throughput |
+| `ImproperBatchNormSync` | BatchNorm is not synchronized correctly |
+| `GradientSyncOverhead` | Distributed gradient sync dominates step time |
+| `LearningRateNotScaled` | LR was not scaled for distributed world size |
+| `PerDeviceBatchTooSmall` | Per-device batch is too small |
+| `WeightDecayCoupledWithAdam` | Adam uses coupled weight decay |
+| `MomentumMisconfigured` | SGD momentum is absent or misconfigured |
+| `AdamLearningRateTooHigh` | Adam LR is too high |
+| `MissingLearningRateWarmup` | Warmup-sensitive training lacks warmup |
+| `AttentionEntropyCollapsed` | Attention entropy collapse harms routing |
+| `PositionalEncodingMisconfigured` | Position encoding setup is wrong |
+| `QuadraticAttentionMemoryBlowup` | Standard attention memory cost is too high |
+| `DegenerateGeneration` | Generation distribution has collapsed |
+| `BatchNormModeMismatch` | BatchNorm train/eval handling is wrong |
+| `StrideTooAggressive` | CNN stride/pooling is too aggressive |
+| `SpatialAugmentationMissing` | CNN spatial augmentation is insufficient |
+| `ChannelCollapseCause` | CNN channels collapse into redundant features |
 
 ### Recommendation Facts
 Actionable next steps:
@@ -153,6 +220,37 @@ Actionable next steps:
 | `InspectDataPipeline` | Audit preprocessing for leaks |
 | `CollectDomainData` | Gather in-domain test data |
 | `ReduceRegularization` | Lower L1/L2/dropout strength |
+| `ReduceBatchSize` | Reduce batch size |
+| `IncreaseBatchSize` | Increase batch size |
+| `ReduceMomentum` | Lower optimizer momentum |
+| `ReduceWeightDecay` | Lower weight decay |
+| `UseLeakyReLU` | Use LeakyReLU/GELU/ELU |
+| `UseGradientClipping` | Clip gradients |
+| `TruncateOrChunkInput` | Truncate or chunk long inputs |
+| `FixTokenizer` | Audit tokenizer coverage and special tokens |
+| `IncreaseReceptiveField` | Widen CNN receptive field |
+| `EnableDynamicLossScaling` | Enable dynamic AMP loss scaling |
+| `UseBf16` | Use bfloat16 where supported |
+| `KeepMasterWeightsInFp32` | Keep fp32 optimizer master weights |
+| `UseSyncBatchNorm` | Synchronize BatchNorm across workers |
+| `IncreaseDataLoaderWorkers` | Tune data-loader workers and prefetching |
+| `UseGradientAccumulation` | Accumulate gradients across microbatches |
+| `ScaleLearningRateByWorldSize` | Scale LR for distributed world size |
+| `UseAdamW` | Switch coupled Adam decay to AdamW |
+| `EnableNesterovMomentum` | Enable Nesterov momentum for SGD |
+| `UseLearningRateWarmup` | Add LR warmup |
+| `AddLearningRateWarmup` | Add transformer-friendly LR warmup |
+| `UseGradientCheckpointing` | Reduce activation memory with checkpointing |
+| `UseFlashAttention` | Use memory-efficient attention kernels |
+| `ApplyLabelSmoothing` | Apply label smoothing |
+| `ClipAttentionLogits` | Clip or temperature-scale attention logits |
+| `ChunkOrTruncateInput` | Chunk or truncate transformer inputs |
+| `FixPositionalEncoding` | Correct positional encoding setup |
+| `AdjustDecodingStrategy` | Tune decoding to avoid repetition |
+| `AddSpatialAugmentation` | Add image spatial augmentation |
+| `ReduceStride` | Reduce early stride/pooling |
+| `FixBatchNormMomentum` | Fix BatchNorm momentum/statistics |
+| `UseGlobalAveragePooling` | Use global average pooling |
 
 ---
 
@@ -196,7 +294,7 @@ Actionable next steps:
 | TEST_005 | ValidationLossHigh ∧ TestAccuracyLow | PoorGeneralization |
 | TEST_006 | PoorGeneralization ∧ ¬ValidationAccuracyHigh | DistributionShift |
 
-### Optimization Rules (OPT_001–OPT_006)
+### Optimization Rules (OPT_001-OPT_009)
 | Rule ID | Antecedents | Consequent |
 |---|---|---|
 | OPT_001 | GradientExplosion | UseWeightClipping |
@@ -205,8 +303,11 @@ Actionable next steps:
 | OPT_004 | LearningRateTooHigh ∧ OscillatingLoss | UseWeightClipping |
 | OPT_005 | LearningRateTooLow ∧ SlowConvergence | AddBatchNormalization |
 | OPT_006 | GradientExplosion ∧ GradientVanishing | BadWeightInitialization |
+| OPT_007 | NaNLoss | NumericalInstability |
+| OPT_008 | NumericalInstability | UseGradientClipping |
+| OPT_009 | OscillatingLoss ∧ NumericalInstability | MomentumTooHigh |
 
-### Architecture Rules (ARCH_001–ARCH_008)
+### Architecture Rules (ARCH_001-ARCH_009)
 | Rule ID | Antecedents | Consequent |
 |---|---|---|
 | ARCH_001 | ModelTooComplex | ReduceModelComplexity |
@@ -217,9 +318,111 @@ Actionable next steps:
 | ARCH_006 | ExcessiveRegularization | ReduceRegularization |
 | ARCH_007 | GradientVanishing ∧ LargeDataset | AddBatchNormalization |
 | ARCH_008 | OverfittingObserved ∧ LargeDataset | AddDropout |
+| ARCH_009 | DeadReLUDetected | UseLeakyReLU |
 
-### Recommendation Rules (REC_001–REC_016)
-Translate causes directly into recommendations. Each rule fires once per run using `NOT()` guards to avoid duplicates.
+### Data Rules (DATA_001-DATA_005)
+| Rule ID | Antecedents | Consequent |
+|---|---|---|
+| DATA_001 | DataLeakageSuspected | InspectDataPipeline |
+| DATA_002 | ValidationAccuracyHigh ∧ TestAccuracyLow | DistributionShift |
+| DATA_003 | NoisyLabels | PoorDataQuality |
+| DATA_004 | PoorDataQuality | ImproveLabelQuality |
+| DATA_005 | ClassImbalanceDetected | DataImbalance |
+
+### Mixed Precision Rules (AMP_001-AMP_007)
+| Rule ID | Antecedents | Consequent |
+|---|---|---|
+| AMP_001 | UsesMixedPrecision ∧ NaNLoss | Fp16RangeExceeded |
+| AMP_002 | UsesMixedPrecision ∧ MixedPrecisionOverflow | Fp16RangeExceeded |
+| AMP_003 | UsesMixedPrecision ∧ LossScaleOverflow | LossScalingMisconfigured |
+| AMP_004 | UsesMixedPrecision ∧ GradientUnderflow | Fp16GradientUnderflow |
+| AMP_005 | UsesMixedPrecision ∧ LossScalingMisconfigured | EnableDynamicLossScaling |
+| AMP_006 | UsesMixedPrecision ∧ Fp16RangeExceeded | UseBf16 |
+| AMP_007 | UsesMixedPrecision ∧ Fp16GradientUnderflow | KeepMasterWeightsInFp32 |
+
+### Distributed Rules (DIST_001-DIST_010)
+| Rule ID | Antecedents | Consequent |
+|---|---|---|
+| DIST_001 | UsesDistributedTraining ∧ MultiGpuThroughputLow ∧ GpuUnderutilization | DataLoadingBottleneck |
+| DIST_002 | UsesDistributedTraining ∧ BatchNormDesync | ImproperBatchNormSync |
+| DIST_003 | UsesDistributedTraining ∧ GradientSyncSlow | GradientSyncOverhead |
+| DIST_004 | UsesDistributedTraining ∧ PerDeviceBatchTooSmallObserved | PerDeviceBatchTooSmall |
+| DIST_005 | UsesDistributedTraining ∧ SlowConvergence | LearningRateNotScaled |
+| DIST_006 | UsesDistributedTraining ∧ DataLoadingBottleneck | IncreaseDataLoaderWorkers |
+| DIST_007 | UsesDistributedTraining ∧ ImproperBatchNormSync | UseSyncBatchNorm |
+| DIST_008 | UsesDistributedTraining ∧ GradientSyncOverhead | UseGradientAccumulation |
+| DIST_009 | UsesDistributedTraining ∧ LearningRateNotScaled | ScaleLearningRateByWorldSize |
+| DIST_010 | UsesDistributedTraining ∧ PerDeviceBatchTooSmall | UseGradientAccumulation |
+
+### Optimizer Interaction Rules (OPTZ_001-OPTZ_006)
+| Rule ID | Antecedents | Consequent |
+|---|---|---|
+| OPTZ_001 | OptimizerIsAdam ∧ CoupledWeightDecayUsed | WeightDecayCoupledWithAdam |
+| OPTZ_002 | OptimizerIsAdam ∧ WeightDecayCoupledWithAdam | UseAdamW |
+| OPTZ_003 | OptimizerIsSGD ∧ MissingMomentum | MomentumMisconfigured |
+| OPTZ_004 | OptimizerIsSGD ∧ MomentumMisconfigured | EnableNesterovMomentum |
+| OPTZ_005 | OptimizerIsAdam ∧ AdamHighLearningRateInstability | AdamLearningRateTooHigh |
+| OPTZ_006 | OptimizerIsAdam ∧ AdamLearningRateTooHigh | UseLearningRateWarmup |
+
+### Transformer Rules (TF_001-TF_017)
+| Rule ID | Antecedents | Consequent |
+|---|---|---|
+| TF_001 | ModelIsTransformer ∧ AttentionCollapse | PoorGeneralization |
+| TF_002 | ModelIsTransformer ∧ TokenizationIssue | FixTokenizer |
+| TF_003 | ModelIsTransformer ∧ ContextLengthExceeded | TruncateOrChunkInput |
+| TF_004 | ModelIsTransformer ∧ AttentionCollapse | AddBatchNormalization |
+| TF_005 | ModelIsTransformer ∧ WarmupMissing | MissingLearningRateWarmup |
+| TF_006 | ModelIsTransformer ∧ MissingLearningRateWarmup | AddLearningRateWarmup |
+| TF_007 | ModelIsTransformer ∧ AttentionEntropyCollapse | AttentionEntropyCollapsed |
+| TF_008 | ModelIsTransformer ∧ AttentionEntropyCollapsed | ClipAttentionLogits |
+| TF_009 | ModelIsTransformer ∧ PositionalEncodingProblem | PositionalEncodingMisconfigured |
+| TF_010 | ModelIsTransformer ∧ PositionalEncodingMisconfigured | FixPositionalEncoding |
+| TF_011 | ModelIsTransformer ∧ LongSequenceMemoryBlowup | QuadraticAttentionMemoryBlowup |
+| TF_012 | ModelIsTransformer ∧ QuadraticAttentionMemoryBlowup | UseGradientCheckpointing |
+| TF_013 | ModelIsTransformer ∧ QuadraticAttentionMemoryBlowup | UseFlashAttention |
+| TF_014 | ModelIsTransformer ∧ RepetitiveGeneration | DegenerateGeneration |
+| TF_015 | ModelIsTransformer ∧ DegenerateGeneration | ApplyLabelSmoothing |
+| TF_016 | ModelIsTransformer ∧ DegenerateGeneration | AdjustDecodingStrategy |
+| TF_017 | ModelIsTransformer ∧ ContextLengthExceeded | ChunkOrTruncateInput |
+
+### CNN Rules (CNN_001-CNN_011)
+| Rule ID | Antecedents | Consequent |
+|---|---|---|
+| CNN_001 | ModelIsCNN ∧ FeatureCollapse | PoorGeneralization |
+| CNN_002 | ModelIsCNN ∧ ReceptiveFieldTooSmall | IncreaseReceptiveField |
+| CNN_003 | ModelIsCNN ∧ DeadReLUDetected | UseLeakyReLU |
+| CNN_004 | ModelIsCNN ∧ BatchNormTrainEvalMismatch | BatchNormModeMismatch |
+| CNN_005 | ModelIsCNN ∧ BatchNormModeMismatch | FixBatchNormMomentum |
+| CNN_006 | ModelIsCNN ∧ AggressivePoolingOrStride | StrideTooAggressive |
+| CNN_007 | ModelIsCNN ∧ StrideTooAggressive | ReduceStride |
+| CNN_008 | ModelIsCNN ∧ InsufficientSpatialAugmentation | SpatialAugmentationMissing |
+| CNN_009 | ModelIsCNN ∧ SpatialAugmentationMissing | AddSpatialAugmentation |
+| CNN_010 | ModelIsCNN ∧ ChannelCollapse | ChannelCollapseCause |
+| CNN_011 | ModelIsCNN ∧ ChannelCollapseCause | UseGlobalAveragePooling |
+
+### Recommendation Rules (REC_001-REC_020)
+| Rule ID | Antecedents | Consequent |
+|---|---|---|
+| REC_001 | LearningRateTooHigh | ReduceLearningRate |
+| REC_002 | LearningRateTooLow | IncreaseLearningRate |
+| REC_003 | ModelTooComplex | AddDropout |
+| REC_004 | ModelTooComplex | UseEarlyStopping |
+| REC_005 | ModelTooSimple | IncreaseModelComplexity |
+| REC_006 | InsufficientRegularization | AddDropout |
+| REC_007 | InsufficientRegularization | UseEarlyStopping |
+| REC_008 | ExcessiveRegularization | RemoveDropout |
+| REC_009 | BadWeightInitialization | UseProperInitialization |
+| REC_010 | PoorDataQuality | ImproveLabelQuality |
+| REC_011 | DataImbalance | RebalanceClasses |
+| REC_012 | DataImbalance | UseWeightedLoss |
+| REC_013 | DistributionShift | CollectDomainData |
+| REC_014 | DistributionShift | ApplyDataAugmentation |
+| REC_015 | PoorGeneralization | InspectDataPipeline |
+| REC_016 | OverfittingObserved | IncreaseDatasetSize |
+| REC_017 | BatchSizeTooLarge | ReduceBatchSize |
+| REC_018 | BatchSizeTooSmall | IncreaseBatchSize |
+| REC_019 | MomentumTooHigh | ReduceMomentum |
+| REC_020 | WeightDecayTooHigh | ReduceWeightDecay |
 
 ---
 
@@ -256,6 +459,8 @@ python main.py --list          # show all built-in scenarios
 python main.py symptoms=TrainingLossHigh,OscillatingLoss
 python main.py symptoms=TrainingAccuracyHigh,ValidationAccuracyLow,SmallDataset
 python main.py symptoms=GradientExplosion,GradientVanishing
+python main.py symptoms=UsesMixedPrecision,NaNLoss
+python main.py symptoms=ModelIsTransformer,LongSequenceMemoryBlowup
 ```
 
 ---
@@ -298,10 +503,11 @@ cd dl_debugger
 python -m pytest tests/ -v
 ```
 
-All 71 tests use real Experta inference — no mocks.
+All 202 tests use real Experta inference — no mocks.
 
 Test coverage:
 - Rule firing and fact derivation for all rule modules
+- Context gating for Transformer, CNN, AMP, distributed, and optimizer rules
 - Recommendation generation from every cause
 - Explanation structure and audit-trail integrity
 - Engine reset and fact isolation between runs
@@ -337,4 +543,4 @@ Either add to `data/scenario_loader.py`'s `BUILTIN_SCENARIOS` dict, or add a JSO
 - **NOT() guards** — every rule that asserts a fact guards with `NOT(FactClass())` to prevent duplicates and infinite loops.
 - **XAI by default** — every rule fires an `Explanation` fact alongside the derived fact, giving a complete audit trail.
 - **Injected vs derived** — the engine tracks which facts were user-supplied so `OverfittingObserved` correctly appears as a derived cause rather than a user symptom.
-- **Multiple inheritance composition** — `DebuggingKnowledgeEngine` inherits from all six rule classes; Experta merges all `@Rule` methods via the Rete algorithm.
+- **Multiple inheritance composition** — `DebuggingKnowledgeEngine` inherits from all rule classes; Experta merges all `@Rule` methods via the Rete algorithm.

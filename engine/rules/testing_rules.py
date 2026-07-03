@@ -34,6 +34,7 @@ class TestingRules(KnowledgeEngine):
         ValidationAccuracyHigh(),
         TestAccuracyLow(),
         NOT(DistributionShift()),
+        salience=1,
     )
     def test_001_distribution_shift(self) -> None:
         """High validation accuracy with low test accuracy is the canonical

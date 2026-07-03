@@ -23,9 +23,9 @@ _WS_RE = re.compile(r"\s+")
 def normalize(text: str) -> str:
     """Return a normalised form of *text* suitable for phrase matching."""
     lowered = text.lower()
-    # expand multi-word synonyms first (they may contain spaces)
+    # Expand synonyms only as standalone tokens/phrases.
     for src, dst in SYNONYMS.items():
-        lowered = lowered.replace(src, dst)
+        lowered = re.sub(rf"\b{re.escape(src)}\b", dst, lowered)
     no_punct = _PUNCT_RE.sub(" ", lowered)
     collapsed = _WS_RE.sub(" ", no_punct).strip()
     return collapsed

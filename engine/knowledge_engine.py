@@ -41,8 +41,33 @@ from models.facts import (
     ContextLengthExceeded,
     FeatureCollapse,
     ReceptiveFieldTooSmall,
+    MixedPrecisionOverflow,
+    LossScaleOverflow,
+    GradientUnderflow,
+    MultiGpuThroughputLow,
+    GpuUnderutilization,
+    BatchNormDesync,
+    GradientSyncSlow,
+    PerDeviceBatchTooSmallObserved,
+    CoupledWeightDecayUsed,
+    MissingMomentum,
+    AdamHighLearningRateInstability,
+    WarmupMissing,
+    AttentionEntropyCollapse,
+    PositionalEncodingProblem,
+    LongSequenceMemoryBlowup,
+    RepetitiveGeneration,
+    BatchNormTrainEvalMismatch,
+    AggressivePoolingOrStride,
+    InsufficientSpatialAugmentation,
+    ChannelCollapse,
+    # Context facts
     ModelIsTransformer,
     ModelIsCNN,
+    UsesMixedPrecision,
+    UsesDistributedTraining,
+    OptimizerIsAdam,
+    OptimizerIsSGD,
     # Cause facts
     LearningRateTooHigh,
     LearningRateTooLow,
@@ -59,6 +84,26 @@ from models.facts import (
     MomentumTooHigh,
     WeightDecayTooHigh,
     NumericalInstability,
+    LossScalingMisconfigured,
+    Fp16RangeExceeded,
+    Fp16GradientUnderflow,
+    DataLoadingBottleneck,
+    ImproperBatchNormSync,
+    GradientSyncOverhead,
+    LearningRateNotScaled,
+    PerDeviceBatchTooSmall,
+    WeightDecayCoupledWithAdam,
+    MomentumMisconfigured,
+    AdamLearningRateTooHigh,
+    MissingLearningRateWarmup,
+    AttentionEntropyCollapsed,
+    PositionalEncodingMisconfigured,
+    QuadraticAttentionMemoryBlowup,
+    DegenerateGeneration,
+    BatchNormModeMismatch,
+    StrideTooAggressive,
+    SpatialAugmentationMissing,
+    ChannelCollapseCause,
     # Recommendation facts
     ReduceLearningRate,
     IncreaseLearningRate,
@@ -87,6 +132,28 @@ from models.facts import (
     TruncateOrChunkInput,
     FixTokenizer,
     IncreaseReceptiveField,
+    EnableDynamicLossScaling,
+    UseBf16,
+    KeepMasterWeightsInFp32,
+    UseSyncBatchNorm,
+    IncreaseDataLoaderWorkers,
+    UseGradientAccumulation,
+    ScaleLearningRateByWorldSize,
+    UseAdamW,
+    EnableNesterovMomentum,
+    UseLearningRateWarmup,
+    AddLearningRateWarmup,
+    UseGradientCheckpointing,
+    UseFlashAttention,
+    ApplyLabelSmoothing,
+    ClipAttentionLogits,
+    ChunkOrTruncateInput,
+    FixPositionalEncoding,
+    AdjustDecodingStrategy,
+    AddSpatialAugmentation,
+    ReduceStride,
+    FixBatchNormMomentum,
+    UseGlobalAveragePooling,
     # XAI
     Explanation,
 )
@@ -100,6 +167,9 @@ from engine.rules.recommendation_rules import RecommendationRules
 from engine.rules.data_rules import DataRules
 from engine.rules.transformer_rules import TransformerRules
 from engine.rules.cnn_rules import CNNRules
+from engine.rules.mixed_precision_rules import MixedPrecisionRules
+from engine.rules.distributed_rules import DistributedRules
+from engine.rules.optimizer_rules import OptimizerInteractionRules
 
 
 # ---------------------------------------------------------------------------
@@ -133,8 +203,36 @@ SYMPTOM_FACT_CLASSES: set[type] = {
     ContextLengthExceeded,
     FeatureCollapse,
     ReceptiveFieldTooSmall,
+    MixedPrecisionOverflow,
+    LossScaleOverflow,
+    GradientUnderflow,
+    MultiGpuThroughputLow,
+    GpuUnderutilization,
+    BatchNormDesync,
+    GradientSyncSlow,
+    PerDeviceBatchTooSmallObserved,
+    CoupledWeightDecayUsed,
+    MissingMomentum,
+    AdamHighLearningRateInstability,
+    WarmupMissing,
+    AttentionEntropyCollapse,
+    PositionalEncodingProblem,
+    LongSequenceMemoryBlowup,
+    RepetitiveGeneration,
+    BatchNormTrainEvalMismatch,
+    AggressivePoolingOrStride,
+    InsufficientSpatialAugmentation,
+    ChannelCollapse,
+}
+
+# Context/model facts are injectable by class name, but are not diagnoses.
+CONTEXT_FACT_CLASSES: set[type] = {
     ModelIsTransformer,
     ModelIsCNN,
+    UsesMixedPrecision,
+    UsesDistributedTraining,
+    OptimizerIsAdam,
+    OptimizerIsSGD,
 }
 
 CAUSE_FACT_CLASSES: set[type] = {
@@ -153,6 +251,26 @@ CAUSE_FACT_CLASSES: set[type] = {
     MomentumTooHigh,
     WeightDecayTooHigh,
     NumericalInstability,
+    LossScalingMisconfigured,
+    Fp16RangeExceeded,
+    Fp16GradientUnderflow,
+    DataLoadingBottleneck,
+    ImproperBatchNormSync,
+    GradientSyncOverhead,
+    LearningRateNotScaled,
+    PerDeviceBatchTooSmall,
+    WeightDecayCoupledWithAdam,
+    MomentumMisconfigured,
+    AdamLearningRateTooHigh,
+    MissingLearningRateWarmup,
+    AttentionEntropyCollapsed,
+    PositionalEncodingMisconfigured,
+    QuadraticAttentionMemoryBlowup,
+    DegenerateGeneration,
+    BatchNormModeMismatch,
+    StrideTooAggressive,
+    SpatialAugmentationMissing,
+    ChannelCollapseCause,
 }
 
 RECOMMENDATION_FACT_CLASSES: set[type] = {
@@ -183,6 +301,28 @@ RECOMMENDATION_FACT_CLASSES: set[type] = {
     TruncateOrChunkInput,
     FixTokenizer,
     IncreaseReceptiveField,
+    EnableDynamicLossScaling,
+    UseBf16,
+    KeepMasterWeightsInFp32,
+    UseSyncBatchNorm,
+    IncreaseDataLoaderWorkers,
+    UseGradientAccumulation,
+    ScaleLearningRateByWorldSize,
+    UseAdamW,
+    EnableNesterovMomentum,
+    UseLearningRateWarmup,
+    AddLearningRateWarmup,
+    UseGradientCheckpointing,
+    UseFlashAttention,
+    ApplyLabelSmoothing,
+    ClipAttentionLogits,
+    ChunkOrTruncateInput,
+    FixPositionalEncoding,
+    AdjustDecodingStrategy,
+    AddSpatialAugmentation,
+    ReduceStride,
+    FixBatchNormMomentum,
+    UseGlobalAveragePooling,
 }
 
 # Mapping: string name → Fact class (for dynamic symptom injection)
@@ -190,6 +330,7 @@ FACT_CLASS_REGISTRY: dict[str, type] = {
     cls.__name__: cls
     for cls in (
         SYMPTOM_FACT_CLASSES
+        | CONTEXT_FACT_CLASSES
         | CAUSE_FACT_CLASSES
         | RECOMMENDATION_FACT_CLASSES
     )
@@ -210,6 +351,9 @@ class DebuggingKnowledgeEngine(
     DataRules,
     TransformerRules,
     CNNRules,
+    MixedPrecisionRules,
+    DistributedRules,
+    OptimizerInteractionRules,
 ):
     """
     Central expert-system engine that combines all rule modules via multiple
@@ -267,6 +411,8 @@ class DebuggingKnowledgeEngine(
                     }
                 )
             elif name in self._injected_symptoms:
+                symptoms.append(name)
+            elif fact_type in CONTEXT_FACT_CLASSES:
                 symptoms.append(name)
             elif fact_type in SYMPTOM_FACT_CLASSES or fact_type in CAUSE_FACT_CLASSES:
                 causes.append(name)
