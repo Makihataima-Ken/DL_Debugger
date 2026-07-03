@@ -532,6 +532,49 @@ python main.py symptoms=UsesMixedPrecision,NaNLoss
 python main.py symptoms=ModelIsTransformer,LongSequenceMemoryBlowup
 ```
 
+### Interactive What-If Mode
+
+Launch the presentation-only REPL:
+
+```bash
+python main.py -i
+python main.py --interactive
+```
+
+All reasoning still happens inside Experta rules. The interactive layer only edits the input fact set, calls `run_scenario()` or `run_text()`, and compares two `DiagnosisResult` objects.
+
+Commands:
+
+| Command | Example |
+|---|---|
+| `help` | `help` |
+| `facts` / `list` | `facts` |
+| `add <FactName...>` | `add TrainingLossHigh OscillatingLoss` |
+| `remove <FactName...>` | `remove SlowConvergence` |
+| `text <description>` | `text training loss high and loss oscillates` |
+| `scenario <name>` | `scenario overfitting` |
+| `diagnose` / `run` | `diagnose` |
+| `whatif add <FactName...>` | `whatif add SmallDataset` |
+| `whatif remove <FactName...>` | `whatif remove ValidationAccuracyLow` |
+| `reset` / `clear` | `reset` |
+| `quit` / `exit` | `quit` |
+
+Example what-if walkthrough:
+
+```text
+what-if> scenario overfitting
+what-if> diagnose
+what-if> whatif add SmallDataset
+
+ADDED RECOMMENDATIONS
+  Apply Data Augmentation
+
+CONFIDENCE CHANGES
+  + Apply Data Augmentation: 0.640
+```
+
+`whatif add` and `whatif remove` compare the new diagnosis with the previous `diagnose`/`run` result, print added or removed causes, recommendations, conflicts, and confidence changes, then keep the new diagnosis as the next baseline.
+
 ---
 
 ## Example Executions
@@ -572,7 +615,7 @@ cd dl_debugger
 python -m pytest tests/ -v
 ```
 
-All 240 tests use real Experta inference - no mocks.
+All 247 tests use real Experta inference - no mocks.
 
 Test coverage:
 - Rule firing and fact derivation for all rule modules
