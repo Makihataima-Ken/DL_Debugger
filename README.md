@@ -447,10 +447,10 @@ Conflict-resolution facts used for transparent reporting; they are registered bu
 
 ## Conflict Resolution
 
-Contradictory causes are resolved by low-salience Experta meta-rules (`CONFLICT_001`-`CONFLICT_009`) after ordinary diagnostic and recommendation rules have fired. The rules do not retract facts; they declare `CauseConflict` and `SuppressedCause` meta facts. `get_diagnosis()` then filters suppressed causes and recommendations supported only by suppressed causes from the reported result, while preserving the full explanation chain and noisy-OR confidence aggregation.
+Contradictory causes are resolved by low-salience Experta meta-rules (`CONFLICT_001`-`CONFLICT_009`) after ordinary diagnostic and recommendation rules have fired. The rules do not retract facts; they declare `CauseConflict` and `SuppressedCause` meta facts. `get_diagnosis()` then filters suppressed causes and recommendations supported only by suppressed causes from the reported result, while preserving the full explanation chain.
 
 Resolution policy:
-1. Combine each contending cause's supporting `Explanation.confidence` values with the same noisy-OR formula used in reporting.
+1. Combine each contending cause's supporting `Explanation.confidence` values with the conflict resolver's local noisy-OR arbitration. This winner selection is intentionally unchanged by reporting confidence propagation.
 2. Keep the cause with the highest evidence strength.
 3. If evidence strength ties, keep the cause with more supporting explanations.
 4. If still tied, keep the lexicographically first cause name for deterministic output.
@@ -466,6 +466,32 @@ Resolution policy:
 | CONFLICT_007 | InsufficientRegularization vs ExcessiveRegularization |
 | CONFLICT_008 | BatchSizeTooLarge vs BatchSizeTooSmall |
 | CONFLICT_009 | MomentumTooHigh vs MomentumMisconfigured |
+
+---
+
+## Reporting Confidence
+
+Confidence is a reporting-only score computed in `get_diagnosis()` after Experta inference has finished. It never changes rule firing, salience, conflict winners, causes, recommendations, or explanations.
+
+Base confidence starts at `1.0` for facts injected by `run_scenario()`. For `run_text()`, NLP evidence provides the root confidence for matched symptom, model-type, and context facts; roots without NLP evidence still default to `1.0`.
+
+Each `Explanation` contributes:
+
+```text
+contribution = rule_confidence * product(antecedent_confidences)
+```
+
+`rule_confidence` is the rule's existing `Explanation.confidence`. Antecedents use their current propagated confidence, roots use base confidence, and unknown antecedents default to `1.0`. Product aggregation is intentionally conservative: each weak antecedent lowers the whole rule contribution, which makes multi-hop or hedged NLP chains less confident than directly supported conclusions.
+
+When multiple explanations derive the same fact, their contributions are combined with noisy-OR:
+
+```text
+combined = 1 - product(1 - contribution_i)
+```
+
+The explanation graph is not assumed to be acyclic. Confidence propagation uses a bounded fixpoint iteration, stopping when the maximum change is below `1e-6` or after 50 iterations. All reported values are clamped to `[0.0, 1.0]` and rounded to three decimals.
+
+Suppressed causes are excluded from the final confidence dictionary, and recommendations filtered because they were supported only by suppressed causes are excluded as well. `CauseConflict` reporting remains separate from diagnostic winner selection.
 
 ---
 
@@ -546,7 +572,7 @@ cd dl_debugger
 python -m pytest tests/ -v
 ```
 
-All 234 tests use real Experta inference — no mocks.
+All 240 tests use real Experta inference - no mocks.
 
 Test coverage:
 - Rule firing and fact derivation for all rule modules

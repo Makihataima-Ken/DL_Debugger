@@ -346,6 +346,31 @@ FACT_CLASS_REGISTRY: dict[str, type] = {
     )
 }
 
+CONFIDENCE_CONVERGENCE_EPSILON = 1e-6
+CONFIDENCE_FIXPOINT_MAX_ITERATIONS = 50
+
+
+def _clamp_confidence(value: float) -> float:
+    """Keep reported confidences in the public [0.0, 1.0] range."""
+    return max(0.0, min(1.0, float(value)))
+
+
+def _split_antecedents(triggered_by: str) -> list[str]:
+    """Parse Explanation.triggered_by into clean fact names."""
+    return [
+        name.strip()
+        for name in triggered_by.split(",")
+        if name.strip()
+    ]
+
+
+def _noisy_or(values: list[float]) -> float:
+    """Combine independent supporting contributions without exceeding 1.0."""
+    acc = 1.0
+    for value in values:
+        acc *= 1.0 - _clamp_confidence(value)
+    return _clamp_confidence(1.0 - acc)
+
 
 # ---------------------------------------------------------------------------
 # Composite engine
@@ -405,7 +430,7 @@ class DebuggingKnowledgeEngine(
         explanations: list[dict[str, str]] = []
         conflicts: list[dict[str, str]] = []
         suppressed_causes: set[str] = set()
-        confidence_by_fact: dict[str, list[float]] = defaultdict(list)
+        injected_symptoms = getattr(self, "_injected_symptoms", set())
 
         for fact in self.facts.values():
             fact_type = type(fact)
@@ -435,7 +460,7 @@ class DebuggingKnowledgeEngine(
                         "reason": fact["reason"],
                     }
                 )
-            elif name in self._injected_symptoms:
+            elif name in injected_symptoms:
                 symptoms.append(name)
             elif fact_type in CONTEXT_FACT_CLASSES:
                 symptoms.append(name)
@@ -473,22 +498,16 @@ class DebuggingKnowledgeEngine(
         recommendations = filtered_recommendations
 
         # ---- Confidence aggregation (REPORTING ONLY; not diagnostic logic) ----
-        # Each Explanation already encodes the rule-assigned confidence in its
-        # derived fact. We aggregate evidence using a noisy-OR combination so
-        # that multiple rules supporting the same conclusion reinforce it.
-        for exp in explanations:
-            confidence_by_fact[exp["derived"]].append(exp["confidence"])
-
-        def _noisy_or(values: list[float]) -> float:
-            acc = 1.0
-            for v in values:
-                acc *= (1.0 - max(0.0, min(1.0, v)))
-            return round(1.0 - acc, 3)
-
-        confidence = {
-            fact_name: _noisy_or(vals)
-            for fact_name, vals in confidence_by_fact.items()
-        }
+        # The weighted model uses each rule's Explanation.confidence as the
+        # rule weight, discounts it by the product of antecedent confidences,
+        # and combines multiple supports for the same derived fact with
+        # noisy-OR. It never feeds back into Experta rule firing.
+        filtered_recommendation_names = set(recommendation_support) - set(recommendations)
+        confidence = self._compute_reporting_confidence(
+            explanations=explanations,
+            suppressed_causes=suppressed_causes,
+            filtered_recommendations=filtered_recommendation_names,
+        )
 
         return DiagnosisResult(
             symptoms=sorted(set(symptoms)),
@@ -499,13 +518,98 @@ class DebuggingKnowledgeEngine(
             conflicts=sorted(conflicts, key=lambda x: x["rule_id"]),
         )
 
-    def inject_symptoms(self, symptom_names: list[str]) -> None:
+    def _compute_reporting_confidence(
+        self,
+        explanations: list[dict[str, str]],
+        suppressed_causes: set[str],
+        filtered_recommendations: set[str],
+    ) -> dict[str, float]:
+        """Compute weighted, antecedent-aware confidence for reporting only."""
+        excluded_facts = suppressed_causes | filtered_recommendations
+        derived_to_rules: dict[str, list[tuple[float, list[str]]]] = defaultdict(list)
+
+        for exp in explanations:
+            derived = str(exp["derived"])
+            if derived in excluded_facts:
+                continue
+            derived_to_rules[derived].append(
+                (
+                    _clamp_confidence(float(exp["confidence"])),
+                    _split_antecedents(str(exp["triggered_by"])),
+                )
+            )
+
+        if not derived_to_rules:
+            return {}
+
+        root_confidence = {
+            name: _clamp_confidence(confidence)
+            for name, confidence in getattr(
+                self,
+                "_root_confidence_by_fact",
+                {},
+            ).items()
+        }
+        values: dict[str, float] = {
+            name: confidence
+            for name, confidence in root_confidence.items()
+        }
+        for derived in derived_to_rules:
+            values.setdefault(derived, 0.0)
+
+        def antecedent_confidence(name: str, current_values: dict[str, float]) -> float:
+            if name in suppressed_causes:
+                return 0.0
+            return current_values.get(name, root_confidence.get(name, 1.0))
+
+        for _ in range(CONFIDENCE_FIXPOINT_MAX_ITERATIONS):
+            next_values = dict(values)
+            max_change = 0.0
+
+            for derived, rule_supports in derived_to_rules.items():
+                contributions: list[float] = []
+                for rule_confidence, antecedents in rule_supports:
+                    antecedent_product = 1.0
+                    for antecedent in antecedents:
+                        antecedent_product *= antecedent_confidence(
+                            antecedent,
+                            values,
+                        )
+                    contributions.append(rule_confidence * antecedent_product)
+
+                propagated = _noisy_or(contributions)
+                if derived in root_confidence:
+                    propagated = max(root_confidence[derived], propagated)
+                propagated = _clamp_confidence(propagated)
+                max_change = max(
+                    max_change,
+                    abs(propagated - values.get(derived, 0.0)),
+                )
+                next_values[derived] = propagated
+
+            values = next_values
+            if max_change < CONFIDENCE_CONVERGENCE_EPSILON:
+                break
+
+        return {
+            derived: round(_clamp_confidence(values[derived]), 3)
+            for derived in sorted(derived_to_rules)
+        }
+
+    def inject_symptoms(
+        self,
+        symptom_names: list[str],
+        root_confidence: dict[str, float] | None = None,
+    ) -> None:
         """Declare symptom facts by class name.
 
         Parameters
         ----------
         symptom_names:
             List of Fact subclass names (e.g. ``["TrainingLossHigh"]``).
+        root_confidence:
+            Optional base confidence per injected fact. Missing roots default
+            to 1.0, preserving deterministic scenario behavior.
 
         Raises
         ------
@@ -513,31 +617,42 @@ class DebuggingKnowledgeEngine(
             If a name is not found in the fact registry.
         """
         self._injected_symptoms: set[str] = set(symptom_names)
+        root_confidence = root_confidence or {}
+        self._root_confidence_by_fact = {
+            name: _clamp_confidence(root_confidence.get(name, 1.0))
+            for name in symptom_names
+        }
         for name in symptom_names:
             cls = FACT_CLASS_REGISTRY.get(name)
             if cls is None:
                 raise ValueError(
                     f"Unknown fact class: '{name}'. "
                     f"Valid names: {sorted(FACT_CLASS_REGISTRY)}"
-                )
+            )
             self.declare(cls())
 
-    def run_scenario(self, symptom_names: list[str]) -> "DiagnosisResult":
+    def run_scenario(
+        self,
+        symptom_names: list[str],
+        root_confidence: dict[str, float] | None = None,
+    ) -> "DiagnosisResult":
         """Convenience: reset, inject symptoms, run, return diagnosis.
 
         Parameters
         ----------
         symptom_names:
             Fact class names to assert as the starting symptom set.
+        root_confidence:
+            Optional base confidence for injected facts. Scenario callers that
+            omit it get 1.0 for every injected fact.
 
         Returns
         -------
         DiagnosisResult
             Final inference result.
         """
-        self._injected_symptoms: set[str] = set()
         self.reset()
-        self.inject_symptoms(symptom_names)
+        self.inject_symptoms(symptom_names, root_confidence=root_confidence)
         self.run()
         return self.get_diagnosis()
 
@@ -562,7 +677,20 @@ class DebuggingKnowledgeEngine(
         from engine.nlp.symptom_extractor import SymptomExtractor
 
         extraction = SymptomExtractor().extract(text)
-        result = self.run_scenario(extraction.all_fact_names)
+        extracted_roots = set(extraction.all_fact_names)
+        root_confidence: dict[str, float] = {}
+        for evidence in extraction.evidence:
+            if evidence.fact_name not in extracted_roots:
+                continue
+            root_confidence[evidence.fact_name] = max(
+                root_confidence.get(evidence.fact_name, 0.0),
+                _clamp_confidence(evidence.confidence),
+            )
+
+        result = self.run_scenario(
+            extraction.all_fact_names,
+            root_confidence=root_confidence,
+        )
         result.extraction = extraction
         return result
 
@@ -587,7 +715,8 @@ class DiagnosisResult:
         Ordered list of XAI explanation records, each with keys
         ``rule_id``, ``triggered_by``, ``derived``, ``explanation``.
     confidence : dict[str, float]
-        Aggregated confidence per derived fact (noisy-OR over rule evidence).
+        Reporting-only confidence per derived fact. Each rule contribution is
+        weighted by antecedent confidence and merged with noisy-OR.
     conflicts : list[dict[str, str]]
         Ordered list of resolved cause conflicts.
     """
