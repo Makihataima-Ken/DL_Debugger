@@ -84,3 +84,31 @@ class TestExplanationConfidenceField:
         for exp in r.explanations:
             assert "confidence" in exp
             assert 0.0 <= exp["confidence"] <= 1.0
+
+
+class TestNegationEnd2End:
+    def test_negated_overfitting_produces_no_diagnosis(self):
+        r = diagnose("there is no overfitting")
+        assert r.extraction is not None
+        assert r.extraction.all_fact_names == []
+        assert r.causes == []
+        assert r.recommendations == []
+
+    def test_negated_nan_produces_no_nan_diagnosis(self):
+        r = diagnose("no NaNs")
+        assert r.extraction is not None
+        assert "NaNLoss" not in r.extraction.symptom_facts
+        assert "NumericalInstability" not in r.causes
+
+
+class TestExpandedVocabularyEnd2End:
+    def test_loss_blows_up(self):
+        r = diagnose("the loss blows up after a few batches")
+        assert "LearningRateTooHigh" in r.causes
+        assert "ReduceLearningRate" in r.recommendations
+
+    def test_adam_mixed_precision_context(self):
+        r = diagnose("adam with mixed precision produces NaNs")
+        assert "OptimizerIsAdam" in r.extraction.context_facts
+        assert "UsesMixedPrecision" in r.extraction.context_facts
+        assert "Fp16RangeExceeded" in r.causes

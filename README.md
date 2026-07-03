@@ -91,6 +91,16 @@ get_diagnosis()
 
 ---
 
+### NLP Preprocessing
+
+The NLP layer is dependency-free and performs extraction only. It normalises text, expands a controlled synonym list, then maps token-aware phrases to symptom, model-type, and context Fact names. It does not infer causes or recommendations.
+
+Negation handling is bounded and local: cues such as `no`, `not`, `without`, `no sign of`, `free of`, and `rather than` suppress phrase matches in the next five tokens. Curated positive phrases that intentionally contain `not`, such as `loss not decreasing`, `not a number`, `not much data`, and `early layers not learning`, are protected so they still emit their intended facts.
+
+Phrase matching is token-aware rather than raw substring-based. Short keys such as `nan`, `val`, `acc`, and `lr` require token boundaries after normalisation, while longer stem-style vocabulary entries such as `oscillat`, `converg`, `generalis`, and `tokeniz` still match natural inflections. Hedged language such as `maybe`, `might be`, `possibly`, and `seems like` lowers lexical evidence confidence without changing rule confidences.
+
+---
+
 ## Fact Hierarchy
 
 ### Symptom Facts
@@ -536,12 +546,13 @@ cd dl_debugger
 python -m pytest tests/ -v
 ```
 
-All 214 tests use real Experta inference — no mocks.
+All 234 tests use real Experta inference — no mocks.
 
 Test coverage:
 - Rule firing and fact derivation for all rule modules
 - Context gating for Transformer, CNN, AMP, distributed, and optimizer rules
 - Conflict resolution and suppressed-cause reporting filters
+- Negation-aware, token-aware NLP extraction and hedged lexical confidence
 - Recommendation generation from every cause
 - Explanation structure and audit-trail integrity
 - Engine reset and fact isolation between runs

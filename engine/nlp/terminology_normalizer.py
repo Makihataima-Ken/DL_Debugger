@@ -18,11 +18,25 @@ from engine.nlp.training_debugging_vocabulary import SYNONYMS
 
 _PUNCT_RE = re.compile(r"[^a-z0-9%\s]+")
 _WS_RE = re.compile(r"\s+")
+_CONTRACTIONS: dict[str, str] = {
+    "isn't": "is not",
+    "aren't": "are not",
+    "wasn't": "was not",
+    "weren't": "were not",
+    "doesn't": "does not",
+    "don't": "do not",
+    "didn't": "did not",
+    "won't": "will not",
+    "can't": "can not",
+    "cannot": "can not",
+}
 
 
 def normalize(text: str) -> str:
     """Return a normalised form of *text* suitable for phrase matching."""
     lowered = text.lower()
+    for src, dst in _CONTRACTIONS.items():
+        lowered = lowered.replace(src, dst)
     # Expand synonyms only as standalone tokens/phrases.
     for src, dst in SYNONYMS.items():
         lowered = re.sub(rf"\b{re.escape(src)}\b", dst, lowered)

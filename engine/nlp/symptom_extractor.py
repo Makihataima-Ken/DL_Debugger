@@ -22,12 +22,18 @@ class ExtractionResult:
     intent: str
     symptom_facts: list[str] = field(default_factory=list)
     model_type_facts: list[str] = field(default_factory=list)
+    context_facts: list[str] = field(default_factory=list)
     evidence: list[MappedEntity] = field(default_factory=list)
+    negated: list[MappedEntity] = field(default_factory=list)
 
     @property
     def all_fact_names(self) -> list[str]:
-        """Fact names to inject into the engine (symptoms + model types)."""
-        return list(self.symptom_facts) + list(self.model_type_facts)
+        """Fact names to inject into the engine."""
+        return (
+            list(self.symptom_facts)
+            + list(self.model_type_facts)
+            + list(self.context_facts)
+        )
 
     @property
     def lexical_confidence(self) -> float:
@@ -42,11 +48,13 @@ class SymptomExtractor:
 
     def extract(self, text: str) -> ExtractionResult:
         mapping = map_entities(text)
-        evidence = list(mapping.symptoms) + list(mapping.model_types)
+        evidence = list(mapping.symptoms) + list(mapping.model_types) + list(mapping.contexts)
         return ExtractionResult(
             text=text,
             intent=detect_intent(text),
             symptom_facts=mapping.symptom_names(),
             model_type_facts=mapping.model_type_names(),
+            context_facts=mapping.context_names(),
             evidence=evidence,
+            negated=mapping.negated,
         )

@@ -11,10 +11,11 @@ the lookup; no diagnostic inference lives here.
 
 from __future__ import annotations
 
-# phrase -> Fact class name. Phrases are matched as substrings against the
+# phrase -> Fact class name. Phrases are matched token-wise against the
 # normalised text. Order does not matter; all matches are collected.
 SYMPTOM_PHRASES: dict[str, str] = {
     # loss behaviour
+    "oscillat": "OscillatingLoss",
     "loss oscillat": "OscillatingLoss",
     "loss is oscillat": "OscillatingLoss",
     "loss keeps oscillat": "OscillatingLoss",
@@ -27,15 +28,27 @@ SYMPTOM_PHRASES: dict[str, str] = {
     "loss not decreasing": "TrainingLossHigh",
     "loss never converg": "TrainingLossHigh",
     "never converg": "TrainingLossHigh",
+    "loss plateau": "TrainingLossHigh",
+    "loss stuck": "TrainingLossHigh",
+    "stuck loss": "TrainingLossHigh",
     "validation loss high": "ValidationLossHigh",
     "high validation loss": "ValidationLossHigh",
     "val loss high": "ValidationLossHigh",
     # nan / explosion
     "nan": "NaNLoss",
+    "nans": "NaNLoss",
     "not a number": "NaNLoss",
     "loss becomes inf": "NaNLoss",
+    "infinite loss": "NaNLoss",
+    "loss goes to infinity": "NaNLoss",
+    "goes to infinity": "NaNLoss",
+    "inf loss": "NaNLoss",
+    "overflow": "NaNLoss",
+    "explod": "GradientExplosion",
     "loss explod": "GradientExplosion",
     "loss is explod": "GradientExplosion",
+    "loss blows up": "GradientExplosion",
+    "blows up": "GradientExplosion",
     "gradient explod": "GradientExplosion",
     "exploding gradient": "GradientExplosion",
     "gradients blow up": "GradientExplosion",
@@ -48,6 +61,12 @@ SYMPTOM_PHRASES: dict[str, str] = {
     "converges slowly": "SlowConvergence",
     "training is slow": "SlowConvergence",
     "barely improv": "SlowConvergence",
+    "will not learn": "SlowConvergence",
+    "wont learn": "SlowConvergence",
+    "stuck": "SlowConvergence",
+    "plateau": "SlowConvergence",
+    "training plateau": "SlowConvergence",
+    "loss plateau": "SlowConvergence",
     # accuracy
     "training accuracy high": "TrainingAccuracyHigh",
     "high training accuracy": "TrainingAccuracyHigh",
@@ -59,6 +78,9 @@ SYMPTOM_PHRASES: dict[str, str] = {
     "validation accuracy much lower": "ValidationAccuracyLow",
     "validation accuracy is much lower": "ValidationAccuracyLow",
     "val accuracy lower": "ValidationAccuracyLow",
+    "train validation gap": "ValidationAccuracyLow",
+    "train val gap": "ValidationAccuracyLow",
+    "accuracy gap": "ValidationAccuracyLow",
     "validation accuracy high": "ValidationAccuracyHigh",
     "high validation accuracy": "ValidationAccuracyHigh",
     "test accuracy low": "TestAccuracyLow",
@@ -75,6 +97,10 @@ SYMPTOM_PHRASES: dict[str, str] = {
     "class imbalance": "ClassImbalanceDetected",
     "imbalanced dataset": "ClassImbalanceDetected",
     "data leak": "DataLeakageSuspected",
+    "data leakage": "DataLeakageSuspected",
+    "split leakage": "DataLeakageSuspected",
+    "train test contamination": "DataLeakageSuspected",
+    "leaking data": "DataLeakageSuspected",
     "leakage": "DataLeakageSuspected",
     "noisy label": "NoisyLabels",
     "label noise": "NoisyLabels",
@@ -82,6 +108,8 @@ SYMPTOM_PHRASES: dict[str, str] = {
     "small dataset": "SmallDataset",
     "few examples": "SmallDataset",
     "not much data": "SmallDataset",
+    "little data": "SmallDataset",
+    "tiny dataset": "SmallDataset",
     "large dataset": "LargeDataset",
     "millions of examples": "LargeDataset",
     # architecture-specific symptoms
@@ -110,12 +138,29 @@ MODEL_TYPE_PHRASES: dict[str, str] = {
     "gpt": "ModelIsTransformer",
     "llm": "ModelIsTransformer",
     "self-attention": "ModelIsTransformer",
+    "vision transformer": "ModelIsTransformer",
+    "vit": "ModelIsTransformer",
     "cnn": "ModelIsCNN",
     "convolution": "ModelIsCNN",
     "conv net": "ModelIsCNN",
     "convnet": "ModelIsCNN",
     "resnet": "ModelIsCNN",
     "vgg": "ModelIsCNN",
+}
+
+CONTEXT_PHRASES: dict[str, str] = {
+    "mixed precision": "UsesMixedPrecision",
+    "automatic mixed precision": "UsesMixedPrecision",
+    "amp": "UsesMixedPrecision",
+    "fp16": "UsesMixedPrecision",
+    "bf16": "UsesMixedPrecision",
+    "distributed training": "UsesDistributedTraining",
+    "multi gpu": "UsesDistributedTraining",
+    "multi device": "UsesDistributedTraining",
+    "ddp": "UsesDistributedTraining",
+    "adam": "OptimizerIsAdam",
+    "adamw": "OptimizerIsAdam",
+    "sgd": "OptimizerIsSGD",
 }
 
 # Synonym normalisation applied before phrase matching.
@@ -127,4 +172,5 @@ SYNONYMS: dict[str, str] = {
     "grad": "gradient",
     "diverg": "explod",
     "blowing up": "explod",
+    "wont": "will not",
 }
