@@ -154,6 +154,9 @@ from models.facts import (
     ReduceStride,
     FixBatchNormMomentum,
     UseGlobalAveragePooling,
+    # Meta facts
+    SuppressedCause,
+    CauseConflict,
     # XAI
     Explanation,
 )
@@ -170,6 +173,7 @@ from engine.rules.cnn_rules import CNNRules
 from engine.rules.mixed_precision_rules import MixedPrecisionRules
 from engine.rules.distributed_rules import DistributedRules
 from engine.rules.optimizer_rules import OptimizerInteractionRules
+from engine.rules.conflict_resolution_rules import ConflictResolutionRules
 
 
 # ---------------------------------------------------------------------------
@@ -326,6 +330,11 @@ RECOMMENDATION_FACT_CLASSES: set[type] = {
 }
 
 # Mapping: string name → Fact class (for dynamic symptom injection)
+META_FACT_CLASSES: set[type] = {
+    SuppressedCause,
+    CauseConflict,
+}
+
 FACT_CLASS_REGISTRY: dict[str, type] = {
     cls.__name__: cls
     for cls in (
@@ -333,6 +342,7 @@ FACT_CLASS_REGISTRY: dict[str, type] = {
         | CONTEXT_FACT_CLASSES
         | CAUSE_FACT_CLASSES
         | RECOMMENDATION_FACT_CLASSES
+        | META_FACT_CLASSES
     )
 }
 
@@ -354,6 +364,7 @@ class DebuggingKnowledgeEngine(
     MixedPrecisionRules,
     DistributedRules,
     OptimizerInteractionRules,
+    ConflictResolutionRules,
 ):
     """
     Central expert-system engine that combines all rule modules via multiple
@@ -392,6 +403,8 @@ class DebuggingKnowledgeEngine(
         causes: list[str] = []
         recommendations: list[str] = []
         explanations: list[dict[str, str]] = []
+        conflicts: list[dict[str, str]] = []
+        suppressed_causes: set[str] = set()
         confidence_by_fact: dict[str, list[float]] = defaultdict(list)
 
         for fact in self.facts.values():
@@ -410,12 +423,54 @@ class DebuggingKnowledgeEngine(
                         "confidence": float(fact.get("confidence", 0.8)),
                     }
                 )
+            elif fact_type is SuppressedCause:
+                suppressed_causes.add(fact["cause"])
+            elif fact_type is CauseConflict:
+                conflicts.append(
+                    {
+                        "rule_id": fact["rule_id"],
+                        "contending_causes": fact["contending_causes"],
+                        "winner": fact["winner"],
+                        "losers": fact["losers"],
+                        "reason": fact["reason"],
+                    }
+                )
             elif name in self._injected_symptoms:
                 symptoms.append(name)
             elif fact_type in CONTEXT_FACT_CLASSES:
                 symptoms.append(name)
             elif fact_type in SYMPTOM_FACT_CLASSES or fact_type in CAUSE_FACT_CLASSES:
                 causes.append(name)
+
+        causes = [
+            cause for cause in causes
+            if cause not in suppressed_causes
+        ]
+        surviving_causes = set(causes)
+
+        recommendation_support: dict[str, list[set[str]]] = defaultdict(list)
+        for exp in explanations:
+            if exp["derived"] in recommendations:
+                recommendation_support[exp["derived"]].append(
+                    {
+                        name.strip()
+                        for name in exp["triggered_by"].split(",")
+                        if name.strip()
+                    }
+                )
+
+        filtered_recommendations: list[str] = []
+        for recommendation in recommendations:
+            supports = recommendation_support.get(recommendation, [])
+            suppressed_only_supports = [
+                bool(support & suppressed_causes)
+                and not bool(support & surviving_causes)
+                for support in supports
+            ]
+            if supports and all(suppressed_only_supports):
+                continue
+            filtered_recommendations.append(recommendation)
+        recommendations = filtered_recommendations
 
         # ---- Confidence aggregation (REPORTING ONLY; not diagnostic logic) ----
         # Each Explanation already encodes the rule-assigned confidence in its
@@ -441,6 +496,7 @@ class DebuggingKnowledgeEngine(
             recommendations=sorted(set(recommendations)),
             explanations=sorted(explanations, key=lambda x: x["rule_id"]),
             confidence=confidence,
+            conflicts=sorted(conflicts, key=lambda x: x["rule_id"]),
         )
 
     def inject_symptoms(self, symptom_names: list[str]) -> None:
@@ -532,6 +588,8 @@ class DiagnosisResult:
         ``rule_id``, ``triggered_by``, ``derived``, ``explanation``.
     confidence : dict[str, float]
         Aggregated confidence per derived fact (noisy-OR over rule evidence).
+    conflicts : list[dict[str, str]]
+        Ordered list of resolved cause conflicts.
     """
 
     def __init__(
@@ -541,12 +599,14 @@ class DiagnosisResult:
         recommendations: list[str],
         explanations: list[dict[str, str]],
         confidence: dict[str, float] | None = None,
+        conflicts: list[dict[str, str]] | None = None,
     ) -> None:
         self.symptoms = symptoms
         self.causes = causes
         self.recommendations = recommendations
         self.explanations = explanations
         self.confidence = confidence or {}
+        self.conflicts = conflicts or []
         # Optional NLP provenance (set by run_text); None for symptom-only runs.
         self.extraction = None
 

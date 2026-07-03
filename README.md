@@ -30,7 +30,8 @@ dl_debugger/
 │       ├── distributed_rules.py     # DIST_001–DIST_010 (gated on UsesDistributedTraining)
 │       ├── optimizer_rules.py       # OPTZ_001–OPTZ_006 (gated on optimizer context)
 │       ├── transformer_rules.py     # TF_001–TF_017 (gated on ModelIsTransformer)
-│       └── cnn_rules.py             # CNN_001–CNN_011 (gated on ModelIsCNN)
+│       ├── cnn_rules.py             # CNN_001–CNN_011 (gated on ModelIsCNN)
+│       └── conflict_resolution_rules.py # CONFLICT_001–CONFLICT_009
 │
 ├── models/
 │   └── facts.py                     # All Experta Fact subclasses
@@ -252,6 +253,14 @@ Actionable next steps:
 | `FixBatchNormMomentum` | Fix BatchNorm momentum/statistics |
 | `UseGlobalAveragePooling` | Use global average pooling |
 
+### Meta Facts
+Conflict-resolution facts used for transparent reporting; they are registered but not reported as causes:
+
+| Fact Class | Meaning |
+|---|---|
+| `SuppressedCause` | Records a contradictory cause hidden from final diagnosis |
+| `CauseConflict` | Records the winner, loser(s), and resolution reason |
+
 ---
 
 ## Rule Hierarchy
@@ -426,6 +435,30 @@ Actionable next steps:
 
 ---
 
+## Conflict Resolution
+
+Contradictory causes are resolved by low-salience Experta meta-rules (`CONFLICT_001`-`CONFLICT_009`) after ordinary diagnostic and recommendation rules have fired. The rules do not retract facts; they declare `CauseConflict` and `SuppressedCause` meta facts. `get_diagnosis()` then filters suppressed causes and recommendations supported only by suppressed causes from the reported result, while preserving the full explanation chain and noisy-OR confidence aggregation.
+
+Resolution policy:
+1. Combine each contending cause's supporting `Explanation.confidence` values with the same noisy-OR formula used in reporting.
+2. Keep the cause with the highest evidence strength.
+3. If evidence strength ties, keep the cause with more supporting explanations.
+4. If still tied, keep the lexicographically first cause name for deterministic output.
+
+| Rule ID | Contending causes |
+|---|---|
+| CONFLICT_001 | OverfittingObserved vs UnderfittingObserved |
+| CONFLICT_002 | LearningRateTooHigh vs LearningRateTooLow |
+| CONFLICT_003 | LearningRateTooHigh vs LearningRateNotScaled |
+| CONFLICT_004 | LearningRateTooLow vs AdamLearningRateTooHigh |
+| CONFLICT_005 | LearningRateNotScaled vs AdamLearningRateTooHigh |
+| CONFLICT_006 | ModelTooComplex vs ModelTooSimple |
+| CONFLICT_007 | InsufficientRegularization vs ExcessiveRegularization |
+| CONFLICT_008 | BatchSizeTooLarge vs BatchSizeTooSmall |
+| CONFLICT_009 | MomentumTooHigh vs MomentumMisconfigured |
+
+---
+
 ## Installation
 
 ```bash
@@ -503,11 +536,12 @@ cd dl_debugger
 python -m pytest tests/ -v
 ```
 
-All 202 tests use real Experta inference — no mocks.
+All 214 tests use real Experta inference — no mocks.
 
 Test coverage:
 - Rule firing and fact derivation for all rule modules
 - Context gating for Transformer, CNN, AMP, distributed, and optimizer rules
+- Conflict resolution and suppressed-cause reporting filters
 - Recommendation generation from every cause
 - Explanation structure and audit-trail integrity
 - Engine reset and fact isolation between runs

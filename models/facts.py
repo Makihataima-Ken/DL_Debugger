@@ -712,6 +712,28 @@ class UseGlobalAveragePooling(Fact):
 
 
 # ---------------------------------------------------------------------------
+# Meta Facts
+# ---------------------------------------------------------------------------
+
+class SuppressedCause(Fact):
+    """A contradictory cause that lost conflict arbitration."""
+
+    cause: str = Field(str, mandatory=True)
+    superseded_by: str = Field(str, mandatory=True)
+    reason: str = Field(str, mandatory=True)
+
+
+class CauseConflict(Fact):
+    """Transparent record of a resolved contradiction between causes."""
+
+    rule_id: str = Field(str, mandatory=True)
+    contending_causes: str = Field(str, mandatory=True)
+    winner: str = Field(str, mandatory=True)
+    losers: str = Field(str, mandatory=True)
+    reason: str = Field(str, mandatory=True)
+
+
+# ---------------------------------------------------------------------------
 # Explanation Fact
 # ---------------------------------------------------------------------------
 
