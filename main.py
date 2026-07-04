@@ -31,6 +31,7 @@ from engine.knowledge_engine import DebuggingKnowledgeEngine, FACT_CLASS_REGISTR
 from engine.interactive import DiagnosisDiff, WhatIfSession
 from data.scenario_loader import get_builtin_symptoms, BUILTIN_SCENARIOS
 from utils.helpers import banner, format_section, format_explanation, normalise_fact_name
+from web.api import run_server
 
 
 # ---------------------------------------------------------------------------
@@ -550,6 +551,22 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Launch an interactive what-if session.",
     )
+    parser.add_argument(
+        "--serve",
+        action="store_true",
+        help="Start the browser UI and JSON API server.",
+    )
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host for --serve (default: 127.0.0.1).",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Port for --serve (default: 8000).",
+    )
 
     return parser
 
@@ -595,6 +612,10 @@ def main() -> None:
 
     if args.scenario_file:
         _run_file(args.scenario_file)
+        return
+
+    if args.serve:
+        run_server(host=args.host, port=args.port)
         return
 
     parser.print_help()

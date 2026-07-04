@@ -575,6 +575,30 @@ CONFIDENCE CHANGES
 
 `whatif add` and `whatif remove` compare the new diagnosis with the previous `diagnose`/`run` result, print added or removed causes, recommendations, conflicts, and confidence changes, then keep the new diagnosis as the next baseline.
 
+### Browser UI and HTTP API
+
+Launch the dependency-free stdlib web server:
+
+```bash
+python main.py --serve
+python main.py --serve --host 127.0.0.1 --port 8000
+```
+
+Then open `http://127.0.0.1:8000/`. The browser UI lets you select fact names, enter free text, run a built-in scenario, inspect causes/recommendations/conflicts/confidence, and apply what-if add/remove tweaks. The web layer is presentation-only: it validates request shape, delegates diagnosis to `DebuggingKnowledgeEngine` / `WhatIfSession`, serializes the returned objects, and renders the JSON.
+
+API endpoints:
+
+| Method | Path | Body | Response |
+|---|---|---|---|
+| `GET` | `/api/facts` | - | `{"facts": [...]}` |
+| `GET` | `/api/scenarios` | - | `{"scenarios": [...], "definitions": {...}}` |
+| `POST` | `/api/diagnose` | `{"symptoms": ["TrainingLossHigh"]}` | serialized `DiagnosisResult` |
+| `POST` | `/api/diagnose_text` | `{"text": "training loss oscillates"}` | serialized `DiagnosisResult` with extraction summary |
+| `POST` | `/api/scenario` | `{"name": "overfitting"}` | serialized `DiagnosisResult` |
+| `POST` | `/api/whatif` | `{"base": {"facts": [...]}, "action": "add", "facts": [...]}` | `{"result": ..., "diff": ...}` |
+
+Errors return JSON such as `{"error": "Unknown fact name(s): ..."}` with a non-2xx HTTP status.
+
 ---
 
 ## Example Executions
@@ -615,7 +639,7 @@ cd dl_debugger
 python -m pytest tests/ -v
 ```
 
-All 247 tests use real Experta inference - no mocks.
+All 253 tests use real Experta inference - no mocks.
 
 Test coverage:
 - Rule firing and fact derivation for all rule modules

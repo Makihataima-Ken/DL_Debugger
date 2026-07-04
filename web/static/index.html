@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DL Debugger</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8f5;
+      --surface: #ffffff;
+      --ink: #1f2933;
+      --muted: #667085;
+      --line: #d7ddd2;
+      --accent: #0f766e;
+      --accent-strong: #115e59;
+      --warn: #b45309;
+      --danger: #b42318;
+      --soft: #e8f4f1;
+      --soft-warn: #fff4df;
+      --shadow: 0 10px 30px rgba(31, 41, 51, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.45;
+    }
+
+    header {
+      background: #17324d;
+      color: white;
+      padding: 18px 24px;
+      border-bottom: 4px solid #eab308;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 1.45rem;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    header p {
+      margin: 4px 0 0;
+      color: #d8e2ee;
+      max-width: 920px;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(300px, 390px) 1fr;
+      min-height: calc(100vh - 83px);
+    }
+
+    aside {
+      background: var(--surface);
+      border-right: 1px solid var(--line);
+      padding: 20px;
+    }
+
+    section {
+      padding: 20px 24px;
+    }
+
+    .controls {
+      display: grid;
+      gap: 18px;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+    }
+
+    label {
+      font-weight: 700;
+      font-size: 0.92rem;
+    }
+
+    select,
+    textarea,
+    input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: white;
+      color: var(--ink);
+      font: inherit;
+      padding: 9px 10px;
+    }
+
+    select[multiple] {
+      min-height: 190px;
+    }
+
+    textarea {
+      min-height: 94px;
+      resize: vertical;
+    }
+
+    .button-row,
+    .whatif-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    button {
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: var(--accent);
+      color: white;
+      padding: 9px 12px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: white;
+      color: var(--accent-strong);
+      border-color: var(--accent);
+    }
+
+    button.warning {
+      background: var(--warn);
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .status {
+      min-height: 22px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .status.error {
+      color: var(--danger);
+      font-weight: 700;
+    }
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(260px, 1fr));
+      gap: 14px;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+      min-width: 0;
+    }
+
+    .panel.full {
+      grid-column: 1 / -1;
+    }
+
+    .panel h2 {
+      margin: 0 0 10px;
+      font-size: 1rem;
+      letter-spacing: 0;
+    }
+
+    .list {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .item {
+      border-left: 4px solid var(--accent);
+      background: var(--soft);
+      border-radius: 4px;
+      padding: 8px 10px;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .item.warn {
+      border-left-color: var(--warn);
+      background: var(--soft-warn);
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .confidence-row {
+      display: grid;
+      grid-template-columns: minmax(120px, 1fr) 120px;
+      gap: 10px;
+      align-items: center;
+      margin: 8px 0;
+    }
+
+    .bar {
+      height: 9px;
+      background: #e5e7eb;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .bar span {
+      display: block;
+      height: 100%;
+      background: var(--accent);
+    }
+
+    .explanation {
+      border-top: 1px solid var(--line);
+      padding-top: 10px;
+      margin-top: 10px;
+    }
+
+    .diff-added {
+      color: #047857;
+      font-weight: 700;
+    }
+
+    .diff-removed {
+      color: var(--danger);
+      font-weight: 700;
+    }
+
+    @media (max-width: 880px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .results-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>DL Debugger</h1>
+    <p>Diagnose deep-learning training issues with the existing Experta rule engine.</p>
+  </header>
+
+  <main>
+    <aside>
+      <div class="controls">
+        <div class="field">
+          <label for="scenario">Built-in scenario</label>
+          <select id="scenario"></select>
+          <div class="button-row">
+            <button id="run-scenario">Run Scenario</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="facts">Fact names</label>
+          <select id="facts" multiple></select>
+          <div class="button-row">
+            <button id="run-facts">Diagnose Selected</button>
+            <button class="secondary" id="clear-selection">Clear</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="free-text">Free text</label>
+          <textarea id="free-text" placeholder="training loss high and loss oscillates"></textarea>
+          <div class="button-row">
+            <button id="run-text">Diagnose Text</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="whatif-facts">What-if facts</label>
+          <select id="whatif-facts" multiple></select>
+          <div class="whatif-row">
+            <button id="whatif-add">What-if Add</button>
+            <button class="warning" id="whatif-remove">What-if Remove</button>
+          </div>
+        </div>
+
+        <div id="status" class="status"></div>
+      </div>
+    </aside>
+
+    <section>
+      <div class="results-grid">
+        <div class="panel">
+          <h2>Input Symptoms</h2>
+          <ul id="symptoms" class="list"></ul>
+        </div>
+        <div class="panel">
+          <h2>Causes</h2>
+          <ul id="causes" class="list"></ul>
+        </div>
+        <div class="panel">
+          <h2>Recommendations</h2>
+          <ul id="recommendations" class="list"></ul>
+        </div>
+        <div class="panel">
+          <h2>Conflicts</h2>
+          <ul id="conflicts" class="list"></ul>
+        </div>
+        <div class="panel full">
+          <h2>Confidence</h2>
+          <div id="confidence"></div>
+        </div>
+        <div class="panel full">
+          <h2>What-if Diff</h2>
+          <div id="diff" class="muted">Run a diagnosis, then apply a what-if change.</div>
+        </div>
+        <div class="panel full">
+          <h2>Explanations</h2>
+          <div id="explanations" class="muted">No diagnosis yet.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const state = {
+      facts: [],
+      scenarios: {},
+      currentFacts: [],
+      result: null
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    function label(name) {
+      return name.replace(/([a-z])([A-Z])/g, "$1 $2");
+    }
+
+    function selectedValues(select) {
+      return Array.from(select.selectedOptions).map((option) => option.value);
+    }
+
+    function setStatus(message, isError = false) {
+      const status = $("status");
+      status.textContent = message;
+      status.className = isError ? "status error" : "status";
+    }
+
+    async function api(path, options = {}) {
+      const response = await fetch(path, {
+        headers: {"Content-Type": "application/json"},
+        ...options
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body.error || `Request failed with ${response.status}`);
+      }
+      return body;
+    }
+
+    function renderList(id, values, warn = false) {
+      const root = $(id);
+      root.innerHTML = "";
+      if (!values || values.length === 0) {
+        const li = document.createElement("li");
+        li.className = "muted";
+        li.textContent = "None";
+        root.appendChild(li);
+        return;
+      }
+      values.forEach((value) => {
+        const li = document.createElement("li");
+        li.className = warn ? "item warn" : "item";
+        li.textContent = label(value);
+        root.appendChild(li);
+      });
+    }
+
+    function renderConfidence(confidence) {
+      const root = $("confidence");
+      root.innerHTML = "";
+      const entries = Object.entries(confidence || {}).sort(([a], [b]) => a.localeCompare(b));
+      if (entries.length === 0) {
+        root.textContent = "No confidence values.";
+        root.className = "muted";
+        return;
+      }
+      root.className = "";
+      entries.forEach(([name, value]) => {
+        const row = document.createElement("div");
+        row.className = "confidence-row";
+        row.innerHTML = `
+          <div>${label(name)} <span class="muted">${Number(value).toFixed(3)}</span></div>
+          <div class="bar"><span style="width:${Math.max(0, Math.min(1, value)) * 100}%"></span></div>
+        `;
+        root.appendChild(row);
+      });
+    }
+
+    function renderConflicts(conflicts) {
+      const values = (conflicts || []).map((conflict) => {
+        const losers = conflict.losers ? conflict.losers.split(",").map(label).join(", ") : "None";
+        return `${conflict.rule_id}: kept ${label(conflict.winner)}, suppressed ${losers}`;
+      });
+      renderList("conflicts", values, true);
+    }
+
+    function renderExplanations(explanations) {
+      const root = $("explanations");
+      root.innerHTML = "";
+      if (!explanations || explanations.length === 0) {
+        root.textContent = "No explanations generated.";
+        root.className = "muted";
+        return;
+      }
+      root.className = "";
+      explanations.slice(0, 8).forEach((exp) => {
+        const block = document.createElement("div");
+        block.className = "explanation";
+        block.innerHTML = `
+          <strong>${exp.rule_id}</strong>: ${label(exp.derived)}
+          <div class="muted">Triggered by ${exp.triggered_by.split(",").map(label).join(", ")}</div>
+          <div>${exp.explanation}</div>
+        `;
+        root.appendChild(block);
+      });
+    }
+
+    function renderDiff(diff) {
+      const root = $("diff");
+      if (!diff) {
+        root.textContent = "Run a diagnosis, then apply a what-if change.";
+        root.className = "muted";
+        return;
+      }
+      if (!diff.has_changes) {
+        root.textContent = "No visible diagnosis changes.";
+        root.className = "muted";
+        return;
+      }
+
+      const lines = [];
+      diff.added_causes.forEach((name) => lines.push(`<div><span class="diff-added">+ cause</span> ${label(name)}</div>`));
+      diff.removed_causes.forEach((name) => lines.push(`<div><span class="diff-removed">- cause</span> ${label(name)}</div>`));
+      diff.added_recommendations.forEach((name) => lines.push(`<div><span class="diff-added">+ recommendation</span> ${label(name)}</div>`));
+      diff.removed_recommendations.forEach((name) => lines.push(`<div><span class="diff-removed">- recommendation</span> ${label(name)}</div>`));
+      diff.added_conflicts.forEach((name) => lines.push(`<div><span class="diff-added">+ conflict</span> ${name}</div>`));
+      diff.removed_conflicts.forEach((name) => lines.push(`<div><span class="diff-removed">- conflict</span> ${name}</div>`));
+      Object.entries(diff.confidence_changed).forEach(([name, values]) => {
+        lines.push(`<div>~ confidence ${label(name)}: ${Number(values[0]).toFixed(3)} -> ${Number(values[1]).toFixed(3)}</div>`);
+      });
+      Object.entries(diff.confidence_added).forEach(([name, values]) => {
+        lines.push(`<div><span class="diff-added">+ confidence</span> ${label(name)}: ${Number(values[1]).toFixed(3)}</div>`);
+      });
+      Object.entries(diff.confidence_removed).forEach(([name, values]) => {
+        lines.push(`<div><span class="diff-removed">- confidence</span> ${label(name)}: ${Number(values[0]).toFixed(3)}</div>`);
+      });
+
+      root.className = "";
+      root.innerHTML = lines.join("");
+    }
+
+    function renderResult(result) {
+      state.result = result;
+      state.currentFacts = result.symptoms || [];
+      renderList("symptoms", result.symptoms);
+      renderList("causes", result.causes);
+      renderList("recommendations", result.recommendations);
+      renderConflicts(result.conflicts);
+      renderConfidence(result.confidence);
+      renderExplanations(result.explanations);
+      setStatus("Diagnosis complete.");
+    }
+
+    function fillSelect(select, values) {
+      select.innerHTML = "";
+      values.forEach((value) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label(value);
+        select.appendChild(option);
+      });
+    }
+
+    async function loadMetadata() {
+      const facts = await api("/api/facts");
+      const scenarios = await api("/api/scenarios");
+      state.facts = facts.facts;
+      state.scenarios = scenarios.definitions;
+      fillSelect($("facts"), state.facts);
+      fillSelect($("whatif-facts"), state.facts);
+      $("scenario").innerHTML = "";
+      scenarios.scenarios.forEach((name) => {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        $("scenario").appendChild(option);
+      });
+      setStatus("Ready.");
+    }
+
+    async function runSafely(action) {
+      setStatus("Working...");
+      try {
+        await action();
+      } catch (error) {
+        setStatus(error.message, true);
+      }
+    }
+
+    $("run-facts").addEventListener("click", () => runSafely(async () => {
+      const symptoms = selectedValues($("facts"));
+      renderResult(await api("/api/diagnose", {
+        method: "POST",
+        body: JSON.stringify({symptoms})
+      }));
+      renderDiff(null);
+    }));
+
+    $("run-text").addEventListener("click", () => runSafely(async () => {
+      renderResult(await api("/api/diagnose_text", {
+        method: "POST",
+        body: JSON.stringify({text: $("free-text").value})
+      }));
+      renderDiff(null);
+    }));
+
+    $("run-scenario").addEventListener("click", () => runSafely(async () => {
+      renderResult(await api("/api/scenario", {
+        method: "POST",
+        body: JSON.stringify({name: $("scenario").value})
+      }));
+      renderDiff(null);
+    }));
+
+    $("clear-selection").addEventListener("click", () => {
+      Array.from($("facts").options).forEach((option) => { option.selected = false; });
+      setStatus("Selection cleared.");
+    });
+
+    async function runWhatIf(action) {
+      if (!state.result) {
+        setStatus("Run a diagnosis before applying a what-if change.", true);
+        return;
+      }
+      const response = await api("/api/whatif", {
+        method: "POST",
+        body: JSON.stringify({
+          base: {facts: state.currentFacts},
+          action,
+          facts: selectedValues($("whatif-facts"))
+        })
+      });
+      renderResult(response.result);
+      renderDiff(response.diff);
+    }
+
+    $("whatif-add").addEventListener("click", () => runSafely(() => runWhatIf("add")));
+    $("whatif-remove").addEventListener("click", () => runSafely(() => runWhatIf("remove")));
+
+    loadMetadata().catch((error) => setStatus(error.message, true));
+  </script>
+</body>
+</html>
