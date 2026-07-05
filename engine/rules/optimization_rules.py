@@ -1,187 +1,241 @@
 """
 optimization_rules.py
 =====================
-Experta rules related to optimiser-level diagnostics (gradient behaviour,
-learning-rate schedules, weight updates).
+Experta rules for optimizer and numerical-stability recommendations.
 
-Rule IDs: OPT_001 – OPT_006
+Rule IDs: OPT_001 - OPT_009
 """
 
 from experta import KnowledgeEngine, Rule, NOT
 
 from models.facts import (
-    # Symptoms / derived symptoms
+    # Symptoms
     GradientExplosion,
     GradientVanishing,
     OscillatingLoss,
     SlowConvergence,
+    NaNLoss,
     # Causes
     LearningRateTooHigh,
     LearningRateTooLow,
     BadWeightInitialization,
-    # Recommendations (emitted directly from optimiser rules)
+    MomentumTooHigh,
+    NumericalInstability,
+    # Recommendations
     UseWeightClipping,
     UseProperInitialization,
     AddBatchNormalization,
+    UseGradientClipping,
     # XAI
     Explanation,
 )
 
 
 class OptimizationRules(KnowledgeEngine):
-    """Rule set covering optimisation-phase diagnostics."""
+    """Rule set covering optimizer and numerical-stability fixes."""
 
     # ------------------------------------------------------------------
-    # OPT_001 – GradientExplosion → UseWeightClipping
+    # OPT_001 - GradientExplosion -> UseWeightClipping
     # ------------------------------------------------------------------
     @Rule(
         GradientExplosion(),
         NOT(UseWeightClipping()),
     )
     def opt_001_explosion_clipping(self) -> None:
-        """Exploding gradients call for gradient / weight clipping as an
-        immediate stabilisation measure.
-        """
         self.declare(UseWeightClipping())
         self.declare(
             Explanation(
                 rule_id="OPT_001",
                 triggered_by="GradientExplosion",
                 derived="UseWeightClipping",
+                confidence=0.85,
                 explanation=(
-                    "Gradient clipping caps the norm of the gradient vector "
-                    "at each step, preventing runaway updates that cause "
-                    "exploding gradient failures."
+                    "Exploding gradients call for clipping gradient norms or "
+                    "weights so that individual optimizer steps cannot run away."
                 ),
             )
         )
 
     # ------------------------------------------------------------------
-    # OPT_002 – BadWeightInitialization → UseProperInitialization
+    # OPT_002 - BadWeightInitialization -> UseProperInitialization
     # ------------------------------------------------------------------
     @Rule(
         BadWeightInitialization(),
         NOT(UseProperInitialization()),
+        salience=1,
     )
-    def opt_002_bad_init_fix(self) -> None:
-        """Poor weight initialisation should be corrected with an
-        appropriate scheme (He, Xavier, Glorot).
-        """
+    def opt_002_init_scheme(self) -> None:
         self.declare(UseProperInitialization())
         self.declare(
             Explanation(
                 rule_id="OPT_002",
                 triggered_by="BadWeightInitialization",
                 derived="UseProperInitialization",
+                confidence=0.84,
                 explanation=(
-                    "Switching to a principled initialisation scheme "
-                    "(He for ReLU networks, Glorot/Xavier for tanh/sigmoid) "
-                    "ensures that activations and gradients are well-scaled "
-                    "at the start of training."
+                    "Poor initialization is best addressed by switching to an "
+                    "activation-aware scheme such as He or Xavier initialization."
                 ),
             )
         )
 
     # ------------------------------------------------------------------
-    # OPT_003 – GradientVanishing → AddBatchNormalization
+    # OPT_003 - GradientVanishing -> AddBatchNormalization
     # ------------------------------------------------------------------
     @Rule(
         GradientVanishing(),
         NOT(AddBatchNormalization()),
     )
-    def opt_003_vanishing_bn(self) -> None:
-        """Batch normalisation helps mitigate vanishing gradients by keeping
-        layer inputs normalised throughout the network.
-        """
+    def opt_003_vanishing_batch_norm(self) -> None:
         self.declare(AddBatchNormalization())
         self.declare(
             Explanation(
                 rule_id="OPT_003",
                 triggered_by="GradientVanishing",
                 derived="AddBatchNormalization",
+                confidence=0.74,
                 explanation=(
-                    "Batch normalisation standardises layer inputs, reducing "
-                    "internal covariate shift and preserving gradient flow "
-                    "through deep networks where vanishing gradients occur."
+                    "Batch normalization can improve gradient flow by keeping "
+                    "intermediate activations in a trainable numeric range."
                 ),
             )
         )
 
     # ------------------------------------------------------------------
-    # OPT_004 – LearningRateTooHigh + OscillatingLoss → UseWeightClipping
+    # OPT_004 - LearningRateTooHigh + OscillatingLoss -> UseWeightClipping
     # ------------------------------------------------------------------
     @Rule(
         LearningRateTooHigh(),
         OscillatingLoss(),
         NOT(UseWeightClipping()),
     )
-    def opt_004_high_lr_oscillating(self) -> None:
-        """When a high learning rate causes loss oscillation, temporary
-        gradient clipping can stabilise training while the LR is tuned.
-        """
+    def opt_004_high_lr_clip(self) -> None:
         self.declare(UseWeightClipping())
         self.declare(
             Explanation(
                 rule_id="OPT_004",
                 triggered_by="LearningRateTooHigh,OscillatingLoss",
                 derived="UseWeightClipping",
+                confidence=0.78,
                 explanation=(
-                    "Combining a learning-rate reduction with gradient "
-                    "clipping can quickly stabilise a training run that "
-                    "is oscillating due to an overly aggressive learning rate."
+                    "When a high learning rate produces oscillation, clipping "
+                    "acts as a guardrail while the learning rate is retuned."
                 ),
             )
         )
 
     # ------------------------------------------------------------------
-    # OPT_005 – LearningRateTooLow + SlowConvergence → AddBatchNormalization
+    # OPT_005 - LearningRateTooLow + SlowConvergence -> AddBatchNormalization
     # ------------------------------------------------------------------
     @Rule(
         LearningRateTooLow(),
         SlowConvergence(),
         NOT(AddBatchNormalization()),
     )
-    def opt_005_slow_bn(self) -> None:
-        """Batch normalisation can accelerate convergence by smoothing the
-        loss landscape, partially compensating for a low learning rate.
-        """
+    def opt_005_slow_batch_norm(self) -> None:
         self.declare(AddBatchNormalization())
         self.declare(
             Explanation(
                 rule_id="OPT_005",
                 triggered_by="LearningRateTooLow,SlowConvergence",
                 derived="AddBatchNormalization",
+                confidence=0.58,
                 explanation=(
-                    "Batch normalisation smooths the optimisation landscape, "
-                    "allowing faster convergence and making the training "
-                    "less sensitive to the choice of learning rate."
+                    "Slow convergence can improve when normalization reduces "
+                    "internal scale drift and makes optimization less brittle."
                 ),
             )
         )
 
     # ------------------------------------------------------------------
-    # OPT_006 – GradientExplosion + GradientVanishing → BadWeightInitialization
+    # OPT_006 - GradientExplosion + GradientVanishing -> BadWeightInitialization
     # ------------------------------------------------------------------
     @Rule(
         GradientExplosion(),
         GradientVanishing(),
         NOT(BadWeightInitialization()),
+        salience=1,
     )
-    def opt_006_both_gradient_issues(self) -> None:
-        """Simultaneous explosion and vanishing in different layers strongly
-        implicates weight initialisation as the root cause.
-        """
+    def opt_006_mixed_gradient_pathology(self) -> None:
         self.declare(BadWeightInitialization())
         self.declare(
             Explanation(
                 rule_id="OPT_006",
                 triggered_by="GradientExplosion,GradientVanishing",
                 derived="BadWeightInitialization",
+                confidence=0.86,
                 explanation=(
-                    "Observing both exploding and vanishing gradients in "
-                    "different parts of the network is a strong signal that "
-                    "the weight initialisation is miscalibrated, causing "
-                    "inconsistent gradient magnitudes across layers."
+                    "Seeing both exploding and vanishing gradients points to "
+                    "poor scale propagation through the network, often caused "
+                    "by an unsuitable initialization scheme."
+                ),
+            )
+        )
+
+    # ------------------------------------------------------------------
+    # OPT_007 - NaNLoss -> NumericalInstability
+    # ------------------------------------------------------------------
+    @Rule(
+        NaNLoss(),
+        NOT(NumericalInstability()),
+    )
+    def opt_007_nan_instability(self) -> None:
+        self.declare(NumericalInstability())
+        self.declare(
+            Explanation(
+                rule_id="OPT_007",
+                triggered_by="NaNLoss",
+                derived="NumericalInstability",
+                confidence=0.92,
+                explanation=(
+                    "A loss that becomes NaN or Inf indicates numerical "
+                    "overflow or invalid values propagating through training."
+                ),
+            )
+        )
+
+    # ------------------------------------------------------------------
+    # OPT_008 - NumericalInstability -> UseGradientClipping
+    # ------------------------------------------------------------------
+    @Rule(
+        NumericalInstability(),
+        NOT(UseGradientClipping()),
+    )
+    def opt_008_instability_clip(self) -> None:
+        self.declare(UseGradientClipping())
+        self.declare(
+            Explanation(
+                rule_id="OPT_008",
+                triggered_by="NumericalInstability",
+                derived="UseGradientClipping",
+                confidence=0.85,
+                explanation=(
+                    "Clipping the global gradient norm bounds update sizes and "
+                    "is an immediate mitigation for NaN-producing instability."
+                ),
+            )
+        )
+
+    # ------------------------------------------------------------------
+    # OPT_009 - OscillatingLoss + NumericalInstability -> MomentumTooHigh
+    # ------------------------------------------------------------------
+    @Rule(
+        OscillatingLoss(),
+        NumericalInstability(),
+        NOT(MomentumTooHigh()),
+    )
+    def opt_009_oscillation_momentum(self) -> None:
+        self.declare(MomentumTooHigh())
+        self.declare(
+            Explanation(
+                rule_id="OPT_009",
+                triggered_by="OscillatingLoss,NumericalInstability",
+                derived="MomentumTooHigh",
+                confidence=0.6,
+                explanation=(
+                    "Oscillation that coincides with instability can stem from "
+                    "an over-aggressive momentum term accumulating velocity and "
+                    "overshooting minima."
                 ),
             )
         )

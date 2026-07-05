@@ -3,7 +3,7 @@ recommendation_rules.py
 =======================
 Experta rules that translate inferred *causes* into concrete *recommendations*.
 
-Rule IDs: REC_001 – REC_016
+Rule IDs: REC_001 - REC_020
 """
 
 from experta import KnowledgeEngine, Rule, NOT
@@ -22,6 +22,10 @@ from models.facts import (
     DataImbalance,
     PoorGeneralization,
     OverfittingObserved,
+    BatchSizeTooLarge,
+    BatchSizeTooSmall,
+    MomentumTooHigh,
+    WeightDecayTooHigh,
     # Recommendations
     ReduceLearningRate,
     IncreaseLearningRate,
@@ -41,6 +45,10 @@ from models.facts import (
     InspectDataPipeline,
     CollectDomainData,
     ReduceRegularization,
+    ReduceBatchSize,
+    IncreaseBatchSize,
+    ReduceMomentum,
+    ReduceWeightDecay,
     # XAI
     Explanation,
 )
@@ -366,6 +374,82 @@ class RecommendationRules(KnowledgeEngine):
                     "More training data directly reduces overfitting: "
                     "a larger dataset makes memorisation harder and provides "
                     "richer generalisation signal regardless of model size."
+                ),
+            )
+        )
+
+    # ------------------------------------------------------------------
+    # REC_017 - BatchSizeTooLarge -> ReduceBatchSize
+    # ------------------------------------------------------------------
+    @Rule(BatchSizeTooLarge(), NOT(ReduceBatchSize()))
+    def rec_017_reduce_batch_size(self) -> None:
+        self.declare(ReduceBatchSize())
+        self.declare(
+            Explanation(
+                rule_id="REC_017",
+                triggered_by="BatchSizeTooLarge",
+                derived="ReduceBatchSize",
+                confidence=0.8,
+                explanation=(
+                    "Reducing an overly large batch restores gradient noise "
+                    "that can help optimization and generalization."
+                ),
+            )
+        )
+
+    # ------------------------------------------------------------------
+    # REC_018 - BatchSizeTooSmall -> IncreaseBatchSize
+    # ------------------------------------------------------------------
+    @Rule(BatchSizeTooSmall(), NOT(IncreaseBatchSize()))
+    def rec_018_increase_batch_size(self) -> None:
+        self.declare(IncreaseBatchSize())
+        self.declare(
+            Explanation(
+                rule_id="REC_018",
+                triggered_by="BatchSizeTooSmall",
+                derived="IncreaseBatchSize",
+                confidence=0.8,
+                explanation=(
+                    "Increasing a too-small batch reduces gradient variance "
+                    "and can stabilize noisy optimizer steps."
+                ),
+            )
+        )
+
+    # ------------------------------------------------------------------
+    # REC_019 - MomentumTooHigh -> ReduceMomentum
+    # ------------------------------------------------------------------
+    @Rule(MomentumTooHigh(), NOT(ReduceMomentum()))
+    def rec_019_reduce_momentum(self) -> None:
+        self.declare(ReduceMomentum())
+        self.declare(
+            Explanation(
+                rule_id="REC_019",
+                triggered_by="MomentumTooHigh",
+                derived="ReduceMomentum",
+                confidence=0.78,
+                explanation=(
+                    "Reducing momentum lowers accumulated velocity and helps "
+                    "stop oscillatory optimizer overshoot."
+                ),
+            )
+        )
+
+    # ------------------------------------------------------------------
+    # REC_020 - WeightDecayTooHigh -> ReduceWeightDecay
+    # ------------------------------------------------------------------
+    @Rule(WeightDecayTooHigh(), NOT(ReduceWeightDecay()))
+    def rec_020_reduce_weight_decay(self) -> None:
+        self.declare(ReduceWeightDecay())
+        self.declare(
+            Explanation(
+                rule_id="REC_020",
+                triggered_by="WeightDecayTooHigh",
+                derived="ReduceWeightDecay",
+                confidence=0.82,
+                explanation=(
+                    "Reducing excessive weight decay restores capacity that "
+                    "was being suppressed by too much L2 regularization."
                 ),
             )
         )

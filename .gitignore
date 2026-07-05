@@ -9,9 +9,8 @@ wheels/
 # Virtual environments
 .venv
 
-# uv specific ignores
-uv.lock
-pyproject.toml
-
 # extension specific ignores
 dl_debugger-output.*
+
+
+*.diff

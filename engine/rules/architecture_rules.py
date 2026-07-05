@@ -16,6 +16,7 @@ from models.facts import (
     SmallDataset,
     LargeDataset,
     GradientVanishing,
+    DeadReLUDetected,
     # Causes
     ModelTooComplex,
     ModelTooSimple,
@@ -29,6 +30,7 @@ from models.facts import (
     ApplyDataAugmentation,
     IncreaseDatasetSize,
     ReduceRegularization,
+    UseLeakyReLU,
     # XAI
     Explanation,
 )
@@ -232,6 +234,30 @@ class ArchitectureRules(KnowledgeEngine):
                     "provides an inexpensive regularisation signal at each "
                     "forward pass without reducing the model's representational "
                     "capacity at inference time."
+                ),
+            )
+        )
+
+    # ------------------------------------------------------------------
+    # ARCH_009 – DeadReLUDetected -> UseLeakyReLU (architecture-agnostic)
+    # ------------------------------------------------------------------
+    @Rule(
+        DeadReLUDetected(),
+        NOT(UseLeakyReLU()),
+    )
+    def arch_009_dead_relu(self) -> None:
+        """Dead ReLUs anywhere warrant a smoother activation function."""
+        self.declare(UseLeakyReLU())
+        self.declare(
+            Explanation(
+                rule_id="ARCH_009",
+                triggered_by="DeadReLUDetected",
+                derived="UseLeakyReLU",
+                confidence=0.78,
+                explanation=(
+                    "A large fraction of permanently-zero ReLU units indicates "
+                    "the dying-ReLU problem; a leaky/parametric activation keeps "
+                    "a small gradient alive for negative pre-activations."
                 ),
             )
         )

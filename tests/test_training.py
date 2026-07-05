@@ -179,6 +179,27 @@ class TestSlowConvergenceAlone:
 
 
 # ---------------------------------------------------------------------------
+# TRAIN_013 - oscillating loss alone -> LR too high (weak fallback)
+# ---------------------------------------------------------------------------
+
+class TestOscillatingLossAlone:
+    def test_cause_derived(self):
+        result = run(["OscillatingLoss"])
+        assert "LearningRateTooHigh" in result.causes
+
+    def test_weak_fallback_explanation_present(self):
+        result = run(["OscillatingLoss"])
+        rule_ids = [e["rule_id"] for e in result.explanations]
+        assert "TRAIN_013" in rule_ids
+
+    def test_stronger_high_loss_rule_still_fires_when_available(self):
+        result = run(["TrainingLossHigh", "OscillatingLoss"])
+        rule_ids = [e["rule_id"] for e in result.explanations]
+        assert "TRAIN_001" in rule_ids
+        assert "TRAIN_013" not in rule_ids
+
+
+# ---------------------------------------------------------------------------
 # Explanation structure
 # ---------------------------------------------------------------------------
 

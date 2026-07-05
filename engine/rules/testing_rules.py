@@ -11,6 +11,7 @@ from experta import KnowledgeEngine, Rule, NOT
 from models.facts import (
     # Symptoms
     ValidationAccuracyHigh,
+    ValidationAccuracyLow,
     ValidationLossHigh,
     TestAccuracyLow,
     DataLeakageSuspected,
@@ -34,6 +35,7 @@ class TestingRules(KnowledgeEngine):
         ValidationAccuracyHigh(),
         TestAccuracyLow(),
         NOT(DistributionShift()),
+        salience=1,
     )
     def test_001_distribution_shift(self) -> None:
         """High validation accuracy with low test accuracy is the canonical
@@ -161,12 +163,37 @@ class TestingRules(KnowledgeEngine):
         )
 
     # ------------------------------------------------------------------
+    # TEST_007 - Low val acc + low test acc -> PoorGeneralization
+    # ------------------------------------------------------------------
+    @Rule(
+        ValidationAccuracyLow(),
+        TestAccuracyLow(),
+        NOT(PoorGeneralization()),
+    )
+    def test_007_low_val_low_test(self) -> None:
+        """Low validation and test accuracy indicate broad generalisation failure."""
+        self.declare(PoorGeneralization())
+        self.declare(
+            Explanation(
+                rule_id="TEST_007",
+                triggered_by="ValidationAccuracyLow,TestAccuracyLow",
+                derived="PoorGeneralization",
+                explanation=(
+                    "Low validation accuracy together with low test accuracy "
+                    "shows the model is failing beyond the training set, but "
+                    "does not by itself prove a distribution shift."
+                ),
+            )
+        )
+
+    # ------------------------------------------------------------------
     # TEST_006 – PoorGeneralization alone → DistributionShift (secondary)
     # ------------------------------------------------------------------
     @Rule(
         PoorGeneralization(),
         NOT(DistributionShift()),
         NOT(ValidationAccuracyHigh()),
+        NOT(ValidationAccuracyLow()),
     )
     def test_006_poor_gen_shift(self) -> None:
         """Poor generalisation without an obvious validation-accuracy signal

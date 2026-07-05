@@ -121,6 +121,29 @@ class TestHighValLossLowTestAcc:
 
 
 # ---------------------------------------------------------------------------
+# TEST_007 - low validation accuracy + low test accuracy
+# ---------------------------------------------------------------------------
+
+class TestLowValLowTestAcc:
+    def test_poor_generalisation_derived(self):
+        result = run(["ValidationAccuracyLow", "TestAccuracyLow"])
+        assert "PoorGeneralization" in result.causes
+
+    def test_distribution_shift_not_assumed(self):
+        result = run(["ValidationAccuracyLow", "TestAccuracyLow"])
+        assert "DistributionShift" not in result.causes
+
+    def test_inspect_pipeline_recommended(self):
+        result = run(["ValidationAccuracyLow", "TestAccuracyLow"])
+        assert "InspectDataPipeline" in result.recommendations
+
+    def test_explanation_test_007(self):
+        result = run(["ValidationAccuracyLow", "TestAccuracyLow"])
+        rule_ids = [e["rule_id"] for e in result.explanations]
+        assert "TEST_007" in rule_ids
+
+
+# ---------------------------------------------------------------------------
 # Multi-symptom – combined distribution shift + class imbalance
 # ---------------------------------------------------------------------------
 

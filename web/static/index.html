@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DL Debugger Chat</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f8;
+      --surface: #ffffff;
+      --surface-soft: #f8fafc;
+      --ink: #1f2937;
+      --muted: #64748b;
+      --line: #d7dee8;
+      --brand: #0f766e;
+      --brand-dark: #115e59;
+      --accent: #7c3aed;
+      --warn: #b45309;
+      --danger: #b42318;
+      --good-bg: #e8f7f1;
+      --note-bg: #eef2ff;
+      --warn-bg: #fff7ed;
+      --shadow: 0 18px 45px rgba(30, 41, 59, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+    }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(180deg, #edf7f4 0, rgba(237, 247, 244, 0) 260px),
+        var(--bg);
+      color: var(--ink);
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.45;
+    }
+
+    .app {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: 100vh;
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 18px;
+      gap: 14px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 4px 2px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: var(--brand);
+      color: white;
+      font-weight: 800;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.12rem;
+      letter-spacing: 0;
+    }
+
+    .status {
+      min-height: 22px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      text-align: right;
+    }
+
+    .status.error {
+      color: var(--danger);
+      font-weight: 700;
+    }
+
+    .chat-shell {
+      min-height: 0;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: 1fr;
+    }
+
+    .messages {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+      min-height: 420px;
+      max-height: calc(100vh - 190px);
+      padding: 18px;
+      scroll-behavior: smooth;
+    }
+
+    .message {
+      display: grid;
+      gap: 8px;
+      max-width: min(760px, 100%);
+    }
+
+    .message.user {
+      align-self: end;
+      justify-items: end;
+    }
+
+    .message.assistant {
+      align-self: start;
+      justify-items: start;
+    }
+
+    .bubble {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px 14px;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      background: var(--surface-soft);
+    }
+
+    .user .bubble {
+      background: var(--brand);
+      color: white;
+      border-color: var(--brand);
+    }
+
+    .assistant .bubble {
+      background: white;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 0.82rem;
+      padding: 0 2px;
+    }
+
+    .answer {
+      display: grid;
+      gap: 12px;
+      width: min(760px, 100%);
+    }
+
+    .answer-section {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-soft);
+    }
+
+    .answer-section h2 {
+      margin: 0;
+      font-size: 0.94rem;
+      letter-spacing: 0;
+    }
+
+    .summary-text {
+      margin: 0;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      min-width: 0;
+    }
+
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: white;
+      padding: 5px 8px;
+      font-size: 0.88rem;
+      overflow-wrap: anywhere;
+    }
+
+    .chip.cause {
+      background: var(--note-bg);
+      border-color: #c7d2fe;
+    }
+
+    .chip.recommendation {
+      background: var(--good-bg);
+      border-color: #b7e4d2;
+    }
+
+    .chip.warn {
+      background: var(--warn-bg);
+      border-color: #fed7aa;
+    }
+
+    .list {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .list li {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .evidence-grid,
+    .confidence-grid {
+      display: grid;
+      gap: 8px;
+    }
+
+    .evidence-item {
+      display: grid;
+      grid-template-columns: minmax(130px, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: white;
+    }
+
+    .confidence-item {
+      display: grid;
+      grid-template-columns: minmax(150px, 1fr) 130px;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .bar {
+      height: 8px;
+      background: #e5e7eb;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .bar span {
+      display: block;
+      height: 100%;
+      width: 0;
+      background: var(--accent);
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .composer {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 10px;
+      align-items: end;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 10px 28px rgba(30, 41, 59, 0.08);
+      padding: 10px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 52px;
+      max-height: 160px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 11px;
+      color: var(--ink);
+      font: inherit;
+      background: white;
+    }
+
+    textarea:focus,
+    button:focus {
+      outline: 3px solid rgba(15, 118, 110, 0.24);
+      outline-offset: 2px;
+    }
+
+    button {
+      min-height: 42px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 0 14px;
+      color: white;
+      background: var(--brand);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    button.secondary {
+      color: var(--brand-dark);
+      background: white;
+      border-color: var(--brand);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.58;
+    }
+
+    @media (max-width: 720px) {
+      .app {
+        padding: 12px;
+      }
+
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .status {
+        text-align: left;
+      }
+
+      .messages {
+        min-height: 360px;
+        max-height: calc(100vh - 220px);
+        padding: 14px;
+      }
+
+      .composer {
+        grid-template-columns: 1fr;
+      }
+
+      button {
+        width: 100%;
+      }
+
+      .evidence-item,
+      .confidence-item {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">DL</div>
+        <h1>DL Debugger Chat</h1>
+      </div>
+      <div id="status" class="status">Ready</div>
+    </header>
+
+    <section class="chat-shell" aria-label="Diagnosis chat">
+      <div id="messages" class="messages" aria-live="polite"></div>
+    </section>
+
+    <form id="composer" class="composer">
+      <textarea
+        id="prompt"
+        name="prompt"
+        rows="2"
+        placeholder="training loss is high and validation accuracy keeps dropping"
+        autocomplete="off"
+      ></textarea>
+      <button id="send" type="submit">Send</button>
+      <button id="clear" class="secondary" type="button">Clear</button>
+    </form>
+  </main>
+
+  <script>
+    const messages = document.getElementById("messages");
+    const form = document.getElementById("composer");
+    const prompt = document.getElementById("prompt");
+    const sendButton = document.getElementById("send");
+    const clearButton = document.getElementById("clear");
+    const status = document.getElementById("status");
+
+    function label(name) {
+      if (!name) {
+        return "";
+      }
+      return String(name).replace(/([a-z])([A-Z])/g, "$1 $2");
+    }
+
+    function setStatus(message, isError = false) {
+      status.textContent = message;
+      status.className = isError ? "status error" : "status";
+    }
+
+    function appendMessage(role, body) {
+      const wrapper = document.createElement("article");
+      wrapper.className = `message ${role}`;
+
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.textContent = role === "user" ? "You" : "DL Debugger";
+
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      if (typeof body === "string") {
+        bubble.textContent = body;
+      } else {
+        bubble.appendChild(body);
+      }
+
+      wrapper.append(meta, bubble);
+      messages.appendChild(wrapper);
+      messages.scrollTop = messages.scrollHeight;
+      return wrapper;
+    }
+
+    function normalizeResponse(payload) {
+      const diagnosis = payload.result || payload.diagnosis || payload;
+      const extraction = (
+        diagnosis.extraction ||
+        payload.extraction ||
+        payload.nlp ||
+        payload.nlp_result ||
+        null
+      );
+      return {...diagnosis, extraction};
+    }
+
+    async function api(path, options = {}) {
+      const response = await fetch(path, {
+        headers: {"Content-Type": "application/json"},
+        ...options
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body.error || `Request failed with ${response.status}`);
+      }
+      return body;
+    }
+
+    function toArray(value) {
+      return Array.isArray(value) ? value : [];
+    }
+
+    function score(value) {
+      const number = Number(value);
+      if (!Number.isFinite(number)) {
+        return 0;
+      }
+      return Math.max(0, Math.min(1, number));
+    }
+
+    function makeSection(title) {
+      const section = document.createElement("section");
+      section.className = "answer-section";
+
+      const heading = document.createElement("h2");
+      heading.textContent = title;
+      section.appendChild(heading);
+
+      return section;
+    }
+
+    function renderChips(values, kind) {
+      const row = document.createElement("div");
+      row.className = "chip-row";
+
+      if (values.length === 0) {
+        const empty = document.createElement("span");
+        empty.className = "muted";
+        empty.textContent = "None";
+        row.appendChild(empty);
+        return row;
+      }
+
+      values.forEach((value) => {
+        const chip = document.createElement("span");
+        chip.className = `chip ${kind || ""}`.trim();
+        chip.textContent = label(value);
+        row.appendChild(chip);
+      });
+
+      return row;
+    }
+
+    function renderSummary(result) {
+      const section = makeSection("Answer");
+      const text = document.createElement("p");
+      text.className = "summary-text";
+
+      const causes = toArray(result.causes);
+      const recommendations = toArray(result.recommendations);
+      if (causes.length === 0 && recommendations.length === 0) {
+        text.textContent = "I could not derive a rule-backed diagnosis from the recognized facts.";
+      } else {
+        const causeText = causes.length
+          ? `Most likely cause: ${causes.slice(0, 2).map(label).join(", ")}.`
+          : "No root cause was derived.";
+        const recText = recommendations.length
+          ? `Recommended next step: ${label(recommendations[0])}.`
+          : "No recommendation was derived.";
+        text.textContent = `${causeText} ${recText}`;
+      }
+
+      section.appendChild(text);
+      return section;
+    }
+
+    function renderDiagnosis(result) {
+      const section = makeSection("Diagnosis");
+      section.appendChild(renderChips(toArray(result.causes), "cause"));
+      return section;
+    }
+
+    function renderRecommendations(result) {
+      const section = makeSection("Recommendations");
+      section.appendChild(renderChips(toArray(result.recommendations), "recommendation"));
+      return section;
+    }
+
+    function renderExtraction(result) {
+      const extraction = result.extraction || {};
+      const section = makeSection("NLP Evidence");
+      const facts = (
+        toArray(extraction.all_fact_names).length
+          ? toArray(extraction.all_fact_names)
+          : [
+              ...toArray(extraction.symptom_facts),
+              ...toArray(extraction.cause_facts),
+              ...toArray(extraction.model_type_facts),
+              ...toArray(extraction.context_facts)
+            ]
+      );
+
+      section.appendChild(renderChips(facts, ""));
+
+      const evidence = toArray(extraction.evidence);
+      if (evidence.length > 0) {
+        const grid = document.createElement("div");
+        grid.className = "evidence-grid";
+
+        evidence.forEach((item) => {
+          const row = document.createElement("div");
+          row.className = "evidence-item";
+
+          const left = document.createElement("div");
+          left.textContent = `${label(item.fact_name)} from "${item.phrase || ""}"`;
+
+          const right = document.createElement("div");
+          right.className = "muted";
+          right.textContent = score(item.confidence).toFixed(3);
+
+          row.append(left, right);
+          grid.appendChild(row);
+        });
+
+        section.appendChild(grid);
+      }
+
+      const negated = toArray(extraction.negated);
+      if (negated.length > 0) {
+        const negatedFacts = negated.map((item) => item.fact_name || item);
+        section.appendChild(renderChips(negatedFacts, "warn"));
+      }
+
+      return section;
+    }
+
+    function renderConfidence(result) {
+      const entries = Object.entries(result.confidence || {})
+        .sort(([a], [b]) => a.localeCompare(b));
+      if (entries.length === 0) {
+        return null;
+      }
+
+      const section = makeSection("Confidence");
+      const grid = document.createElement("div");
+      grid.className = "confidence-grid";
+
+      entries.forEach(([name, value]) => {
+        const row = document.createElement("div");
+        row.className = "confidence-item";
+
+        const text = document.createElement("div");
+        text.textContent = `${label(name)} ${score(value).toFixed(3)}`;
+
+        const bar = document.createElement("div");
+        bar.className = "bar";
+        const fill = document.createElement("span");
+        fill.style.width = `${score(value) * 100}%`;
+        bar.appendChild(fill);
+
+        row.append(text, bar);
+        grid.appendChild(row);
+      });
+
+      section.appendChild(grid);
+      return section;
+    }
+
+    function renderExplanations(result) {
+      const explanations = toArray(result.explanations).slice(0, 5);
+      if (explanations.length === 0) {
+        return null;
+      }
+
+      const section = makeSection("Explanation");
+      const list = document.createElement("ul");
+      list.className = "list";
+
+      explanations.forEach((exp) => {
+        const item = document.createElement("li");
+        const triggered = String(exp.triggered_by || "")
+          .split(",")
+          .map((part) => label(part.trim()))
+          .filter(Boolean)
+          .join(", ");
+        const intro = `${exp.rule_id || "Rule"}: ${label(exp.derived)}`;
+        item.textContent = triggered
+          ? `${intro} from ${triggered}. ${exp.explanation || ""}`
+          : `${intro}. ${exp.explanation || ""}`;
+        list.appendChild(item);
+      });
+
+      section.appendChild(list);
+      return section;
+    }
+
+    function renderConflicts(result) {
+      const conflicts = toArray(result.conflicts);
+      if (conflicts.length === 0) {
+        return null;
+      }
+
+      const section = makeSection("Conflicts");
+      const list = document.createElement("ul");
+      list.className = "list";
+
+      conflicts.forEach((conflict) => {
+        const item = document.createElement("li");
+        const losers = String(conflict.losers || "")
+          .split(",")
+          .map((part) => label(part.trim()))
+          .filter(Boolean)
+          .join(", ");
+        item.textContent = `${conflict.rule_id || "Rule"} kept ${label(conflict.winner)}; suppressed ${losers || "none"}.`;
+        list.appendChild(item);
+      });
+
+      section.appendChild(list);
+      return section;
+    }
+
+    function renderAnswer(rawPayload) {
+      const result = normalizeResponse(rawPayload);
+      const root = document.createElement("div");
+      root.className = "answer";
+
+      [
+        renderSummary(result),
+        renderDiagnosis(result),
+        renderRecommendations(result),
+        renderExtraction(result),
+        renderConfidence(result),
+        renderConflicts(result),
+        renderExplanations(result)
+      ].filter(Boolean).forEach((section) => root.appendChild(section));
+
+      return root;
+    }
+
+    async function ask(text) {
+      appendMessage("user", text);
+      setStatus("Working");
+      sendButton.disabled = true;
+
+      try {
+        const payload = await api("/api/diagnose_text", {
+          method: "POST",
+          body: JSON.stringify({text})
+        });
+        appendMessage("assistant", renderAnswer(payload));
+        setStatus("Ready");
+      } catch (error) {
+        appendMessage("assistant", error.message);
+        setStatus(error.message, true);
+      } finally {
+        sendButton.disabled = false;
+        prompt.focus();
+      }
+    }
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const text = prompt.value.trim();
+      if (!text) {
+        setStatus("Enter a question", true);
+        prompt.focus();
+        return;
+      }
+      prompt.value = "";
+      ask(text);
+    });
+
+    prompt.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        form.requestSubmit();
+      }
+    });
+
+    clearButton.addEventListener("click", () => {
+      messages.innerHTML = "";
+      setStatus("Ready");
+      prompt.focus();
+    });
+  </script>
+</body>
+</html>
