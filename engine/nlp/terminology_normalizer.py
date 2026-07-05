@@ -32,15 +32,21 @@ _CONTRACTIONS: dict[str, str] = {
 }
 
 
-def normalize(text: str) -> str:
-    """Return a normalised form of *text* suitable for phrase matching."""
+def expand_terms(text: str) -> str:
+    """Lowercase *text* and expand controlled contractions/synonyms."""
     lowered = text.lower()
     for src, dst in _CONTRACTIONS.items():
         lowered = lowered.replace(src, dst)
     # Expand synonyms only as standalone tokens/phrases.
     for src, dst in SYNONYMS.items():
         lowered = re.sub(rf"\b{re.escape(src)}\b", dst, lowered)
-    no_punct = _PUNCT_RE.sub(" ", lowered)
+    return lowered
+
+
+def normalize(text: str) -> str:
+    """Return a normalised form of *text* suitable for token utilities."""
+    expanded = expand_terms(text)
+    no_punct = _PUNCT_RE.sub(" ", expanded)
     collapsed = _WS_RE.sub(" ", no_punct).strip()
     return collapsed
 

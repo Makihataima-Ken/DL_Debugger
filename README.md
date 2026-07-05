@@ -93,11 +93,13 @@ get_diagnosis()
 
 ### NLP Preprocessing
 
-The NLP layer is dependency-free and performs extraction only. It normalises text, expands a controlled synonym list, then maps token-aware phrases to symptom, model-type, and context Fact names. It does not infer causes or recommendations.
+The NLP layer performs extraction only. It expands a controlled synonym list, then uses spaCy in rule-based mode to map controlled vocabulary phrases to symptom, model-type, and context Fact names. It does not infer causes or recommendations, and it does not use statistical NER for labeling.
 
-Negation handling is bounded and local: cues such as `no`, `not`, `without`, `no sign of`, `free of`, and `rather than` suppress phrase matches in the next five tokens. Curated positive phrases that intentionally contain `not`, such as `loss not decreasing`, `not a number`, `not much data`, and `early layers not learning`, are protected so they still emit their intended facts.
+Phrase matching uses spaCy's tokenizer, lemmatizer, and `PhraseMatcher(attr="LEMMA")`, so controlled phrases such as `loss oscillates` match natural inflections like `loss oscillating` and `loss oscillated` without stem-prefix hacks. The matcher only emits Fact class names already present in the project registry.
 
-Phrase matching is token-aware rather than raw substring-based. Short keys such as `nan`, `val`, `acc`, and `lr` require token boundaries after normalisation, while longer stem-style vocabulary entries such as `oscillat`, `converg`, `generalis`, and `tokeniz` still match natural inflections. Hedged language such as `maybe`, `might be`, `possibly`, and `seems like` lowers lexical evidence confidence without changing rule confidences.
+Negation handling uses spaCy sentence boundaries and dependency parses instead of a fixed token window. Cues such as `no`, `not`, `without`, `no sign of`, `free of`, and `rather than` suppress only matches in the same clause, so `no overfitting, but the loss oscillates` negates overfitting without suppressing oscillating loss. Curated positive phrases that intentionally contain `not`, such as `loss not decreasing`, `not a number`, `not much data`, and `early layers not learning`, are protected so they still emit their intended facts.
+
+Hedged language such as `maybe`, `might be`, `possibly`, and `seems like` lowers lexical evidence confidence without changing rule confidences.
 
 ---
 
@@ -502,7 +504,13 @@ Suppressed causes are excluded from the final confidence dictionary, and recomme
 pip install -r requirements.txt
 ```
 
-> **Note:** Requires `frozendict==2.3.4` (overrides experta's default) for Python 3.12 compatibility.
+The NLP layer uses the `en_core_web_sm` spaCy model from the direct wheel URL pinned in `requirements.txt` and `pyproject.toml`; installing the requirements installs the model package. The project keeps `experta==1.9.4` with its required `frozendict==1.2` pin.
+
+For uv-managed setup:
+
+```bash
+uv sync
+```
 
 ---
 

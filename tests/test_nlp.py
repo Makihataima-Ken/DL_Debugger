@@ -34,6 +34,15 @@ class TestSymptomExtraction:
         assert "OscillatingLoss" in r.symptom_facts
         assert "TrainingLossHigh" in r.symptom_facts
 
+    def test_lemma_based_oscillating_loss_forms(self):
+        for text in (
+            "loss oscillates",
+            "loss is oscillating",
+            "loss oscillated wildly",
+        ):
+            r = extract(text)
+            assert "OscillatingLoss" in r.symptom_facts
+
     def test_overfitting_from_memorizing(self):
         r = extract("the model is just memorizing the training set")
         assert "OverfittingObserved" in r.symptom_facts
@@ -107,10 +116,21 @@ class TestNegationHandling:
         r = extract("early layers not learning")
         assert "GradientVanishing" in r.symptom_facts
 
+    def test_negation_does_not_bleed_across_clause(self):
+        r = extract("no overfitting, but the loss oscillates")
+        assert "OverfittingObserved" not in r.symptom_facts
+        assert "OscillatingLoss" in r.symptom_facts
+        assert [e.fact_name for e in r.negated] == ["OverfittingObserved"]
+
 
 class TestExpandedVocabulary:
     def test_plateau_maps_to_slow_convergence(self):
         r = extract("training has plateaued and seems stuck")
+        assert "SlowConvergence" in r.symptom_facts
+
+    def test_loss_plateau_emits_both_intended_facts(self):
+        r = extract("loss plateau")
+        assert "TrainingLossHigh" in r.symptom_facts
         assert "SlowConvergence" in r.symptom_facts
 
     def test_infinity_maps_to_nan(self):
@@ -149,3 +169,16 @@ class TestHedgedConfidence:
         hedged = extract("maybe validation accuracy is much lower")
         assert "ValidationAccuracyLow" in hedged.symptom_facts
         assert hedged.lexical_confidence < definite.lexical_confidence
+
+    def test_hedged_match_lowers_entity_confidence(self):
+        definite = extract("loss oscillates")
+        hedged = extract("might be loss oscillating")
+        definite_confidence = max(
+            e.confidence for e in definite.evidence
+            if e.fact_name == "OscillatingLoss"
+        )
+        hedged_confidence = max(
+            e.confidence for e in hedged.evidence
+            if e.fact_name == "OscillatingLoss"
+        )
+        assert hedged_confidence < definite_confidence
