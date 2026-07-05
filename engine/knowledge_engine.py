@@ -460,7 +460,7 @@ class DebuggingKnowledgeEngine(
                         "reason": fact["reason"],
                     }
                 )
-            elif name in injected_symptoms:
+            elif name in injected_symptoms and fact_type in SYMPTOM_FACT_CLASSES:
                 symptoms.append(name)
             elif fact_type in CONTEXT_FACT_CLASSES:
                 symptoms.append(name)

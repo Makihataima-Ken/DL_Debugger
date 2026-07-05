@@ -11,6 +11,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import pytest
+
 from engine.nlp.terminology_normalizer import normalize
 from engine.nlp.symptom_extractor import SymptomExtractor
 
@@ -151,6 +153,66 @@ class TestExpandedVocabulary:
         assert "OptimizerIsAdam" in r.context_facts
         assert "UsesMixedPrecision" in r.context_facts
         assert "NaNLoss" in r.symptom_facts
+
+
+class TestReportedPromptVocabulary:
+    @pytest.mark.parametrize(
+        ("text", "expected"),
+        [
+            (
+                "training loss is high and the loss keeps oscillating",
+                {"TrainingLossHigh", "OscillatingLoss"},
+            ),
+            (
+                "the model is converging very slowly and the training loss is still high",
+                {"SlowConvergence", "TrainingLossHigh"},
+            ),
+            (
+                "the early layers are barely learning and gradients look near zero",
+                {"GradientVanishing"},
+            ),
+            (
+                "training accuracy is high but validation accuracy is low",
+                {"TrainingAccuracyHigh", "ValidationAccuracyLow"},
+            ),
+            (
+                "both training accuracy and validation accuracy are low",
+                {"TrainingAccuracyLow", "ValidationAccuracyLow"},
+            ),
+            (
+                "validation loss is high and the dataset is small",
+                {"ValidationLossHigh", "SmallDataset"},
+            ),
+            (
+                "validation accuracy is high but test accuracy is low",
+                {"ValidationAccuracyHigh", "TestAccuracyLow"},
+            ),
+            (
+                "labels are noisy and training loss stays high",
+                {"NoisyLabels", "TrainingLossHigh"},
+            ),
+            (
+                "the transformer runs out of memory on long sequences",
+                {"LongSequenceMemoryBlowup", "ModelIsTransformer"},
+            ),
+            (
+                "attention entropy collapses and warmup is missing",
+                {"AttentionEntropyCollapse", "WarmupMissing", "ModelIsTransformer"},
+            ),
+            (
+                "batch norm stats are desynchronized across GPUs",
+                {"BatchNormDesync", "UsesDistributedTraining"},
+            ),
+        ],
+    )
+    def test_reported_prompt_phrases_extract_expected_facts(self, text, expected):
+        r = extract(text)
+        assert expected <= set(r.all_fact_names)
+
+    def test_user_stated_cause_is_separate_from_symptoms(self):
+        r = extract("maybe the learning rate is too high because loss seems to oscillate")
+        assert "LearningRateTooHigh" in r.cause_facts
+        assert "LearningRateTooHigh" not in r.symptom_facts
 
 
 class TestTokenAwareMatching:

@@ -334,3 +334,28 @@ class TrainingRules(KnowledgeEngine):
                 ),
             )
         )
+
+    # ------------------------------------------------------------------
+    # TRAIN_013 - Oscillating loss alone -> LR too high (weak fallback)
+    # ------------------------------------------------------------------
+    @Rule(
+        OscillatingLoss(),
+        NOT(TrainingLossHigh()),
+        NOT(LearningRateTooHigh()),
+    )
+    def train_013_oscillation_lr_fallback(self) -> None:
+        """Loss oscillation alone is weaker evidence for an excessive LR."""
+        self.declare(LearningRateTooHigh())
+        self.declare(
+            Explanation(
+                rule_id="TRAIN_013",
+                triggered_by="OscillatingLoss",
+                derived="LearningRateTooHigh",
+                explanation=(
+                    "Loss oscillation by itself is weaker but useful evidence "
+                    "that the optimiser may be overshooting; lowering the "
+                    "learning rate is a reasonable first check."
+                ),
+                confidence=0.55,
+            )
+        )

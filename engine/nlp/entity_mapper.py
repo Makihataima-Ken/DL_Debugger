@@ -4,8 +4,8 @@ entity_mapper.py
 Maps normalised text to Fact class *names* using the controlled vocabulary.
 
 This module performs lexical matching only. It deliberately produces no
-diagnosis: it just answers "which symptom/model-type facts does this text
-mention, and with what lexical confidence".
+diagnosis: it just answers "which symptom, stated-cause, model-type, and
+context facts does this text mention, and with what lexical confidence".
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ from engine.nlp.terminology_normalizer import expand_terms
 from engine.nlp.training_debugging_vocabulary import (
     FactNameSpec,
     SYMPTOM_PHRASES,
+    CAUSE_PHRASES,
     MODEL_TYPE_PHRASES,
     CONTEXT_PHRASES,
 )
@@ -62,7 +63,7 @@ DOMAIN_LEMMA_OVERRIDES = {
     "underfitting": "underfit",
 }
 
-EntityCategory = Literal["symptoms", "model_types", "contexts"]
+EntityCategory = Literal["symptoms", "causes", "model_types", "contexts"]
 
 
 @dataclass(frozen=True)
@@ -92,6 +93,7 @@ class MappedEntity:
 @dataclass
 class MappingResult:
     symptoms: list[MappedEntity] = field(default_factory=list)
+    causes: list[MappedEntity] = field(default_factory=list)
     model_types: list[MappedEntity] = field(default_factory=list)
     contexts: list[MappedEntity] = field(default_factory=list)
     negated: list[MappedEntity] = field(default_factory=list)
@@ -106,6 +108,12 @@ class MappingResult:
     def model_type_names(self) -> list[str]:
         seen: dict[str, None] = {}
         for e in self.model_types:
+            seen.setdefault(e.fact_name, None)
+        return list(seen.keys())
+
+    def cause_names(self) -> list[str]:
+        seen: dict[str, None] = {}
+        for e in self.causes:
             seen.setdefault(e.fact_name, None)
         return list(seen.keys())
 
@@ -143,6 +151,7 @@ def _fact_names(spec: FactNameSpec) -> tuple[str, ...]:
 def _vocabulary_sources() -> tuple[tuple[EntityCategory, dict[str, FactNameSpec]], ...]:
     return (
         ("symptoms", SYMPTOM_PHRASES),
+        ("causes", CAUSE_PHRASES),
         ("model_types", MODEL_TYPE_PHRASES),
         ("contexts", CONTEXT_PHRASES),
     )
@@ -271,6 +280,8 @@ def _confidence_for_match(
 def _append_entity(result: MappingResult, category: EntityCategory, entity: MappedEntity) -> None:
     if category == "symptoms":
         result.symptoms.append(entity)
+    elif category == "causes":
+        result.causes.append(entity)
     elif category == "model_types":
         result.model_types.append(entity)
     else:

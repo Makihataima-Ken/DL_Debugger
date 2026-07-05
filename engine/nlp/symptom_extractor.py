@@ -1,7 +1,7 @@
 """
 symptom_extractor.py
 ====================
-Top-level NLP entry point: free text -> symptom & model-type Fact names.
+Top-level NLP entry point: free text -> Fact names.
 
 The extractor orchestrates normalise -> entity map -> intent. It returns an
 ExtractionResult that the knowledge engine consumes via run_text(). It NEVER
@@ -21,6 +21,7 @@ class ExtractionResult:
     text: str
     intent: str
     symptom_facts: list[str] = field(default_factory=list)
+    cause_facts: list[str] = field(default_factory=list)
     model_type_facts: list[str] = field(default_factory=list)
     context_facts: list[str] = field(default_factory=list)
     evidence: list[MappedEntity] = field(default_factory=list)
@@ -31,6 +32,7 @@ class ExtractionResult:
         """Fact names to inject into the engine."""
         return (
             list(self.symptom_facts)
+            + list(self.cause_facts)
             + list(self.model_type_facts)
             + list(self.context_facts)
         )
@@ -48,11 +50,17 @@ class SymptomExtractor:
 
     def extract(self, text: str) -> ExtractionResult:
         mapping = map_entities(text)
-        evidence = list(mapping.symptoms) + list(mapping.model_types) + list(mapping.contexts)
+        evidence = (
+            list(mapping.symptoms)
+            + list(mapping.causes)
+            + list(mapping.model_types)
+            + list(mapping.contexts)
+        )
         return ExtractionResult(
             text=text,
             intent=detect_intent(text),
             symptom_facts=mapping.symptom_names(),
+            cause_facts=mapping.cause_names(),
             model_type_facts=mapping.model_type_names(),
             context_facts=mapping.context_names(),
             evidence=evidence,

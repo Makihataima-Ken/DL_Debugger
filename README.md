@@ -93,7 +93,7 @@ get_diagnosis()
 
 ### NLP Preprocessing
 
-The NLP layer performs extraction only. It expands a controlled synonym list, then uses spaCy in rule-based mode to map controlled vocabulary phrases to symptom, model-type, and context Fact names. It does not infer causes or recommendations, and it does not use statistical NER for labeling.
+The NLP layer performs extraction only. It expands a controlled synonym list, then uses spaCy in rule-based mode to map controlled vocabulary phrases to symptom, user-stated cause, model-type, and context Fact names. It does not infer causes or recommendations, and it does not use statistical NER for labeling.
 
 Phrase matching uses spaCy's tokenizer, lemmatizer, and `PhraseMatcher(attr="LEMMA")`, so controlled phrases such as `loss oscillates` match natural inflections like `loss oscillating` and `loss oscillated` without stem-prefix hacks. The matcher only emits Fact class names already present in the project registry.
 
@@ -475,7 +475,7 @@ Resolution policy:
 
 Confidence is a reporting-only score computed in `get_diagnosis()` after Experta inference has finished. It never changes rule firing, salience, conflict winners, causes, recommendations, or explanations.
 
-Base confidence starts at `1.0` for facts injected by `run_scenario()`. For `run_text()`, NLP evidence provides the root confidence for matched symptom, model-type, and context facts; roots without NLP evidence still default to `1.0`.
+Base confidence starts at `1.0` for facts injected by `run_scenario()`. For `run_text()`, NLP evidence provides the root confidence for matched symptom, user-stated cause, model-type, and context facts; roots without NLP evidence still default to `1.0`.
 
 Each `Explanation` contributes:
 

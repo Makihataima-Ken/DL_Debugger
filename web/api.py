@@ -50,6 +50,7 @@ def serialize_extraction(extraction: Any | None) -> dict[str, Any] | None:
         "text": extraction.text,
         "intent": extraction.intent,
         "symptom_facts": list(extraction.symptom_facts),
+        "cause_facts": list(getattr(extraction, "cause_facts", [])),
         "model_type_facts": list(extraction.model_type_facts),
         "context_facts": list(extraction.context_facts),
         "all_fact_names": list(extraction.all_fact_names),

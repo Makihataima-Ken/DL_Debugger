@@ -542,6 +542,7 @@
           ? toArray(extraction.all_fact_names)
           : [
               ...toArray(extraction.symptom_facts),
+              ...toArray(extraction.cause_facts),
               ...toArray(extraction.model_type_facts),
               ...toArray(extraction.context_facts)
             ]

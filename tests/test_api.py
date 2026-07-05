@@ -132,3 +132,15 @@ def test_api_diagnose_text_includes_nlp_extraction_summary():
         "OscillatingLoss",
     ]
     assert body["extraction"]["evidence"]
+
+
+def test_api_diagnose_text_exposes_user_stated_cause_facts():
+    status, body = dispatch_api_request(
+        "POST",
+        "/api/diagnose_text",
+        {"text": "the learning rate is too high because loss oscillates"},
+    )
+
+    assert status == HTTPStatus.OK
+    assert "LearningRateTooHigh" in body["causes"]
+    assert body["extraction"]["cause_facts"] == ["LearningRateTooHigh"]

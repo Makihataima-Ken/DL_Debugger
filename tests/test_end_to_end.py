@@ -13,6 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import pytest
+
 from engine.knowledge_engine import DebuggingKnowledgeEngine
 
 
@@ -112,3 +114,139 @@ class TestExpandedVocabularyEnd2End:
         assert "OptimizerIsAdam" in r.extraction.context_facts
         assert "UsesMixedPrecision" in r.extraction.context_facts
         assert "Fp16RangeExceeded" in r.causes
+
+
+class TestReportedPromptEnd2End:
+    @pytest.mark.parametrize(
+        ("text", "expected_causes", "expected_recommendations"),
+        [
+            (
+                "training loss is high and the loss keeps oscillating",
+                {"LearningRateTooHigh"},
+                {"ReduceLearningRate"},
+            ),
+            (
+                "the model is converging very slowly and the training loss is still high",
+                {"LearningRateTooLow"},
+                {"IncreaseLearningRate"},
+            ),
+            (
+                "the early layers are barely learning and gradients look near zero",
+                {"BadWeightInitialization"},
+                {"AddBatchNormalization"},
+            ),
+            (
+                "training accuracy is high but validation accuracy is low",
+                {"OverfittingObserved", "ModelTooComplex"},
+                {"AddDropout"},
+            ),
+            (
+                "both training accuracy and validation accuracy are low",
+                {"UnderfittingObserved", "ModelTooSimple"},
+                {"IncreaseModelComplexity"},
+            ),
+            (
+                "validation loss is high and the dataset is small",
+                {"InsufficientRegularization"},
+                {"UseEarlyStopping"},
+            ),
+            (
+                "validation accuracy is high but test accuracy is low",
+                {"DistributionShift", "PoorGeneralization"},
+                {"CollectDomainData"},
+            ),
+            (
+                "labels are noisy and training loss stays high",
+                {"PoorDataQuality"},
+                {"ImproveLabelQuality"},
+            ),
+            (
+                "the transformer runs out of memory on long sequences",
+                {"QuadraticAttentionMemoryBlowup"},
+                {"UseFlashAttention"},
+            ),
+            (
+                "the transformer has positional encoding problems",
+                {"PositionalEncodingMisconfigured"},
+                {"FixPositionalEncoding"},
+            ),
+            (
+                "attention entropy collapses and warmup is missing",
+                {"AttentionEntropyCollapsed", "MissingLearningRateWarmup"},
+                {"ClipAttentionLogits", "AddLearningRateWarmup"},
+            ),
+            (
+                "batch norm behaves differently between train and eval in my CNN",
+                {"BatchNormModeMismatch"},
+                {"FixBatchNormMomentum"},
+            ),
+            (
+                "the CNN uses aggressive pooling and loses spatial details",
+                {"StrideTooAggressive"},
+                {"ReduceStride"},
+            ),
+            (
+                "fp16 training has gradient underflow",
+                {"Fp16GradientUnderflow"},
+                {"KeepMasterWeightsInFp32"},
+            ),
+            (
+                "multi GPU training has low throughput and GPUs are underutilized",
+                {"DataLoadingBottleneck"},
+                {"IncreaseDataLoaderWorkers"},
+            ),
+            (
+                "distributed training has slow gradient synchronization",
+                {"GradientSyncOverhead"},
+                {"UseGradientAccumulation"},
+            ),
+            (
+                "batch norm stats are desynchronized across GPUs",
+                {"ImproperBatchNormSync"},
+                {"UseSyncBatchNorm"},
+            ),
+            (
+                "loss oscillates but there is no slow convergence",
+                {"LearningRateTooHigh"},
+                {"ReduceLearningRate"},
+            ),
+            (
+                "maybe the learning rate is too high because loss seems to oscillate",
+                {"LearningRateTooHigh"},
+                {"ReduceLearningRate"},
+            ),
+            (
+                "not overfitting, but validation accuracy is low and test accuracy is low",
+                {"PoorGeneralization"},
+                {"InspectDataPipeline"},
+            ),
+            (
+                "the model is free of NaN loss but gradients are vanishing",
+                {"BadWeightInitialization"},
+                {"UseProperInitialization"},
+            ),
+        ],
+    )
+    def test_reported_prompts_have_rule_backed_results(
+        self,
+        text,
+        expected_causes,
+        expected_recommendations,
+    ):
+        r = diagnose(text)
+        assert expected_causes <= set(r.causes)
+        assert expected_recommendations <= set(r.recommendations)
+        assert r.explanations
+
+    def test_high_loss_without_supporting_signal_remains_underdetermined(self):
+        r = diagnose("training loss is high, but no gradient explosion")
+        assert r.extraction is not None
+        assert "TrainingLossHigh" in r.extraction.symptom_facts
+        assert "GradientExplosion" in [item.fact_name for item in r.extraction.negated]
+        assert r.causes == []
+        assert r.recommendations == []
+
+    def test_low_validation_and_low_test_does_not_imply_distribution_shift(self):
+        r = diagnose("not overfitting, but validation accuracy is low and test accuracy is low")
+        assert "PoorGeneralization" in r.causes
+        assert "DistributionShift" not in r.causes
