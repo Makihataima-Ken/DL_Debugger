@@ -11,6 +11,7 @@ import importlib
 from typing import TYPE_CHECKING
 from collections import defaultdict
 
+from utils import experta_compat  # noqa: F401
 from experta import KnowledgeEngine, DefFacts, Fact
 
 from models.facts import (
