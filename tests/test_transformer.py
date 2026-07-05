@@ -51,3 +51,19 @@ def test_transformer_rules_require_context(rule_id, facts, derived, bucket):
     result = run([fact for fact in facts if fact != "ModelIsTransformer"])
     assert derived not in getattr(result, bucket)
     assert rule_id not in [e["rule_id"] for e in result.explanations]
+
+
+def test_tokenization_issue_has_generic_fallback():
+    result = run(["TokenizationIssue"])
+
+    assert "FixTokenizer" in result.recommendations
+    assert "TF_018" in [e["rule_id"] for e in result.explanations]
+
+
+def test_transformer_tokenization_uses_specific_rule_over_fallback():
+    result = run(["ModelIsTransformer", "TokenizationIssue"])
+    rule_ids = [e["rule_id"] for e in result.explanations]
+
+    assert "FixTokenizer" in result.recommendations
+    assert "TF_002" in rule_ids
+    assert "TF_018" not in rule_ids

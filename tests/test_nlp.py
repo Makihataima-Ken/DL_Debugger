@@ -215,6 +215,45 @@ class TestReportedPromptVocabulary:
         assert "LearningRateTooHigh" not in r.symptom_facts
 
 
+class TestAdditionalReportedPromptVocabulary:
+    @pytest.mark.parametrize(
+        ("text", "expected"),
+        [
+            (
+                "Both training and validation accuracy are low.",
+                {"TrainingAccuracyLow", "ValidationAccuracyLow"},
+            ),
+            (
+                "Lots of unk tokens, looks like a tokenization issue.",
+                {"TokenizationIssue"},
+            ),
+            (
+                "The resnet feature maps are constant.",
+                {"ModelIsCNN", "FeatureCollapse"},
+            ),
+            (
+                "Multi gpu training throughput is low and the gpus are idle.",
+                {
+                    "UsesDistributedTraining",
+                    "MultiGpuThroughputLow",
+                    "GpuUnderutilization",
+                },
+            ),
+            (
+                "Using adam with coupled weight decay.",
+                {"OptimizerIsAdam", "CoupledWeightDecayUsed"},
+            ),
+        ],
+    )
+    def test_additional_reported_prompt_phrases_extract_expected_facts(
+        self,
+        text,
+        expected,
+    ):
+        r = extract(text)
+        assert expected <= set(r.all_fact_names)
+
+
 class TestTokenAwareMatching:
     def test_short_key_inside_larger_word_does_not_match(self):
         r = extract("the banana analysis looks fine")

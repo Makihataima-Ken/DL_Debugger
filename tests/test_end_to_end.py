@@ -61,10 +61,10 @@ class TestTransformerGating:
         r = diagnose("my transformer has lots of unk tokens (tokenization problem)")
         assert "FixTokenizer" in r.recommendations
 
-    def test_tokenizer_not_fired_without_transformer(self):
-        # Same tokenization symptom but no model-type mentioned.
+    def test_tokenizer_fallback_without_transformer_context(self):
         r = DebuggingKnowledgeEngine().run_scenario(["TokenizationIssue"])
-        assert "FixTokenizer" not in r.recommendations
+        assert "FixTokenizer" in r.recommendations
+        assert "TF_018" in [exp["rule_id"] for exp in r.explanations]
 
 
 class TestCNNGating:
@@ -250,3 +250,46 @@ class TestReportedPromptEnd2End:
         r = diagnose("not overfitting, but validation accuracy is low and test accuracy is low")
         assert "PoorGeneralization" in r.causes
         assert "DistributionShift" not in r.causes
+
+
+class TestAdditionalReportedPromptEnd2End:
+    @pytest.mark.parametrize(
+        ("text", "expected_causes", "expected_recommendations"),
+        [
+            (
+                "Both training and validation accuracy are low.",
+                {"UnderfittingObserved", "ModelTooSimple"},
+                {"IncreaseModelComplexity"},
+            ),
+            (
+                "Lots of unk tokens, looks like a tokenization issue.",
+                set(),
+                {"FixTokenizer"},
+            ),
+            (
+                "The resnet feature maps are constant.",
+                {"PoorGeneralization"},
+                {"InspectDataPipeline"},
+            ),
+            (
+                "Multi gpu training throughput is low and the gpus are idle.",
+                {"DataLoadingBottleneck"},
+                {"IncreaseDataLoaderWorkers"},
+            ),
+            (
+                "Using adam with coupled weight decay.",
+                {"WeightDecayCoupledWithAdam"},
+                {"UseAdamW"},
+            ),
+        ],
+    )
+    def test_additional_reported_prompts_have_rule_backed_results(
+        self,
+        text,
+        expected_causes,
+        expected_recommendations,
+    ):
+        r = diagnose(text)
+        assert expected_causes <= set(r.causes)
+        assert expected_recommendations <= set(r.recommendations)
+        assert r.explanations

@@ -1,10 +1,10 @@
 """
 transformer_rules.py
 ====================
-Experta rules specific to Transformer/attention architectures. These rules are
+Experta rules specific to Transformer/attention architectures. Most rules are
 gated on ModelIsTransformer so they only fire for the relevant model type.
 
-Rule IDs: TF_001 - TF_017
+Rule IDs: TF_001 - TF_018
 """
 
 from experta import KnowledgeEngine, Rule, NOT
@@ -86,6 +86,28 @@ class TransformerRules(KnowledgeEngine):
                     "Excessive <unk> tokens or vocabulary mismatch corrupts the "
                     "input representation; audit tokenizer coverage and special "
                     "token handling before further training."
+                ),
+            )
+        )
+
+    # TF_018 - TokenizationIssue -> FixTokenizer (generic fallback)
+    @Rule(
+        TokenizationIssue(),
+        NOT(ModelIsTransformer()),
+        NOT(FixTokenizer()),
+    )
+    def tf_018_tokenizer_fallback(self) -> None:
+        self.declare(FixTokenizer())
+        self.declare(
+            Explanation(
+                rule_id="TF_018",
+                triggered_by="TokenizationIssue",
+                derived="FixTokenizer",
+                confidence=0.62,
+                explanation=(
+                    "A tokenizer or vocabulary mismatch is directly actionable "
+                    "even when the model family is not specified; audit unknown "
+                    "tokens, vocabulary coverage, and special-token handling."
                 ),
             )
         )
