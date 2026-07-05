@@ -504,7 +504,7 @@ Suppressed causes are excluded from the final confidence dictionary, and recomme
 pip install -r requirements.txt
 ```
 
-The NLP layer uses the `en_core_web_sm` spaCy model from the direct wheel URL pinned in `requirements.txt` and `pyproject.toml`; installing the requirements installs the model package. The project keeps `experta==1.9.4` with its required `frozendict==1.2` pin.
+The NLP layer uses the `en_core_web_sm` spaCy model from the direct wheel URL pinned in `requirements.txt` and `pyproject.toml`; installing the requirements installs the model package. The project keeps `experta==1.9.4` with its required `frozendict==1.2` pin, and pins `numpy<2` for the spaCy/Thinc binary stack.
 
 For uv-managed setup:
 
@@ -592,7 +592,9 @@ python main.py --serve
 python main.py --serve --host 127.0.0.1 --port 8000
 ```
 
-Then open `http://127.0.0.1:8000/`. The browser UI lets you select fact names, enter free text, run a built-in scenario, inspect causes/recommendations/conflicts/confidence, and apply what-if add/remove tweaks. The web layer is presentation-only: it validates request shape, delegates diagnosis to `DebuggingKnowledgeEngine` / `WhatIfSession`, serializes the returned objects, and renders the JSON.
+Then open `http://127.0.0.1:8000/`. The browser UI is a free-text chatbot: ask a training/debugging question, and it renders the rule-backed answer, recommendations, explanations, confidence, conflicts, and NLP extraction evidence returned by `/api/diagnose_text`.
+
+Predefined scenarios and what-if diagnosis are currently terminal-first workflows through `python main.py --scenario ...` and `python main.py --interactive`. The legacy API endpoints are still present for tests and direct integrations, but the browser only uses free-text diagnosis.
 
 API endpoints:
 

@@ -116,3 +116,19 @@ def test_serialize_diagnosis_result_is_json_roundtrippable():
     assert payload["causes"] == result.causes
     assert payload["extraction"]["all_fact_names"] == result.extraction.all_fact_names
     assert payload["extraction"]["negated"]
+
+
+def test_api_diagnose_text_includes_nlp_extraction_summary():
+    status, body = dispatch_api_request(
+        "POST",
+        "/api/diagnose_text",
+        {"text": "training loss high and loss oscillates"},
+    )
+
+    assert status == HTTPStatus.OK
+    assert "LearningRateTooHigh" in body["causes"]
+    assert body["extraction"]["symptom_facts"] == [
+        "TrainingLossHigh",
+        "OscillatingLoss",
+    ]
+    assert body["extraction"]["evidence"]
