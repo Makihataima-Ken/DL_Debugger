@@ -592,7 +592,7 @@ python main.py --serve
 python main.py --serve --host 127.0.0.1 --port 8000
 ```
 
-Then open `http://127.0.0.1:8000/`. The browser UI is a free-text chatbot: ask a training/debugging question, and it renders the rule-backed answer, recommendations, explanations, confidence, conflicts, and NLP extraction evidence returned by `/api/diagnose_text`.
+Then open `http://127.0.0.1:8000/`. The browser UI includes a searchable problem picker plus the original free-text chatbot: choose a known training/debugging problem or type your own question, and it renders the rule-backed answer, recommendations, explanations, confidence, conflicts, and NLP extraction evidence returned by `/api/diagnose_text`.
 
 Predefined scenarios and what-if diagnosis are currently terminal-first workflows through `python main.py --scenario ...` and `python main.py --interactive`. The legacy API endpoints are still present for tests and direct integrations, but the browser only uses free-text diagnosis.
 
@@ -602,6 +602,7 @@ API endpoints:
 |---|---|---|---|
 | `GET` | `/api/facts` | - | `{"facts": [...]}` |
 | `GET` | `/api/scenarios` | - | `{"scenarios": [...], "definitions": {...}}` |
+| `GET` | `/api/problem_options` | - | `{"categories": [...], "problems": [...]}` |
 | `POST` | `/api/diagnose` | `{"symptoms": ["TrainingLossHigh"]}` | serialized `DiagnosisResult` |
 | `POST` | `/api/diagnose_text` | `{"text": "training loss oscillates"}` | serialized `DiagnosisResult` with extraction summary |
 | `POST` | `/api/scenario` | `{"name": "overfitting"}` | serialized `DiagnosisResult` |
