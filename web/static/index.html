@@ -273,7 +273,7 @@
 
     .composer {
       display: grid;
-      grid-template-columns: 1fr auto auto;
+      grid-template-columns: auto 1fr auto auto;
       gap: 10px;
       align-items: end;
       background: var(--surface);
@@ -281,6 +281,56 @@
       border-radius: 8px;
       box-shadow: 0 10px 28px rgba(30, 41, 59, 0.08);
       padding: 10px;
+    }
+
+    .mode-tabs {
+      display: flex;
+      align-items: stretch;
+      border: 1px solid var(--brand);
+      border-radius: 8px;
+      overflow: hidden;
+      background: white;
+    }
+
+    .mode-tabs button {
+      flex: 1;
+      min-height: 52px;
+      border: 0;
+      border-radius: 0;
+      padding: 0 12px;
+      color: var(--brand-dark);
+      background: white;
+    }
+
+    .mode-tabs button.active {
+      color: white;
+      background: var(--brand);
+    }
+
+    .file-picker {
+      display: flex;
+      align-items: center;
+      min-height: 52px;
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 11px;
+      color: var(--ink);
+      background: white;
+      cursor: pointer;
+      overflow-wrap: anywhere;
+    }
+
+    .file-picker input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .hidden {
+      display: none;
     }
 
     textarea {
@@ -354,6 +404,10 @@
         width: 100%;
       }
 
+      .mode-tabs button {
+        width: auto;
+      }
+
       .evidence-item,
       .confidence-item {
         grid-template-columns: 1fr;
@@ -376,6 +430,10 @@
     </section>
 
     <form id="composer" class="composer">
+      <div class="mode-tabs" role="tablist" aria-label="Input mode">
+        <button class="active" type="button" data-mode="text">Text</button>
+        <button type="button" data-mode="csv">CSV</button>
+      </div>
       <textarea
         id="prompt"
         name="prompt"
@@ -383,6 +441,10 @@
         placeholder="training loss is high and validation accuracy keeps dropping"
         autocomplete="off"
       ></textarea>
+      <label id="csvPicker" class="file-picker hidden">
+        <input id="csvFile" type="file" accept=".csv,text/csv">
+        <span id="csvName">Select CSV</span>
+      </label>
       <button id="send" type="submit">Send</button>
       <button id="clear" class="secondary" type="button">Clear</button>
     </form>
@@ -392,9 +454,14 @@
     const messages = document.getElementById("messages");
     const form = document.getElementById("composer");
     const prompt = document.getElementById("prompt");
+    const csvPicker = document.getElementById("csvPicker");
+    const csvFile = document.getElementById("csvFile");
+    const csvName = document.getElementById("csvName");
     const sendButton = document.getElementById("send");
     const clearButton = document.getElementById("clear");
     const status = document.getElementById("status");
+    const modeButtons = [...document.querySelectorAll("[data-mode]")];
+    let inputMode = "text";
 
     function label(name) {
       if (!name) {
@@ -439,7 +506,12 @@
         payload.nlp_result ||
         null
       );
-      return {...diagnosis, extraction};
+      const trainingHistory = (
+        diagnosis.training_history ||
+        payload.training_history ||
+        null
+      );
+      return {...diagnosis, extraction, training_history: trainingHistory};
     }
 
     async function api(path, options = {}) {
@@ -535,6 +607,10 @@
     }
 
     function renderExtraction(result) {
+      if (!result.extraction) {
+        return null;
+      }
+
       const extraction = result.extraction || {};
       const section = makeSection("NLP Evidence");
       const facts = (
@@ -577,6 +653,53 @@
       if (negated.length > 0) {
         const negatedFacts = negated.map((item) => item.fact_name || item);
         section.appendChild(renderChips(negatedFacts, "warn"));
+      }
+
+      return section;
+    }
+
+    function renderTrainingHistory(result) {
+      const analysis = result.training_history;
+      if (!analysis) {
+        return null;
+      }
+
+      const section = makeSection("Metric Evidence");
+      section.appendChild(renderChips(toArray(analysis.all_fact_names), ""));
+
+      const evidence = toArray(analysis.evidence);
+      if (evidence.length > 0) {
+        const grid = document.createElement("div");
+        grid.className = "evidence-grid";
+
+        evidence.forEach((item) => {
+          const row = document.createElement("div");
+          row.className = "evidence-item";
+
+          const left = document.createElement("div");
+          left.textContent = `${label(item.fact_name)} from ${item.metric || "metrics"}`;
+
+          const right = document.createElement("div");
+          right.className = "muted";
+          right.textContent = score(item.confidence).toFixed(3);
+
+          row.append(left, right);
+          grid.appendChild(row);
+        });
+
+        section.appendChild(grid);
+      }
+
+      const warnings = toArray(analysis.warnings);
+      if (warnings.length > 0) {
+        const list = document.createElement("ul");
+        list.className = "list";
+        warnings.forEach((warning) => {
+          const item = document.createElement("li");
+          item.textContent = warning;
+          list.appendChild(item);
+        });
+        section.appendChild(list);
       }
 
       return section;
@@ -676,6 +799,7 @@
         renderSummary(result),
         renderDiagnosis(result),
         renderRecommendations(result),
+        renderTrainingHistory(result),
         renderExtraction(result),
         renderConfidence(result),
         renderConflicts(result),
@@ -685,7 +809,21 @@
       return root;
     }
 
-    async function ask(text) {
+    function setMode(mode) {
+      inputMode = mode;
+      modeButtons.forEach((button) => {
+        button.classList.toggle("active", button.dataset.mode === mode);
+      });
+      prompt.classList.toggle("hidden", mode !== "text");
+      csvPicker.classList.toggle("hidden", mode !== "csv");
+      if (mode === "text") {
+        prompt.focus();
+      } else {
+        csvFile.focus();
+      }
+    }
+
+    async function askText(text) {
       appendMessage("user", text);
       setStatus("Working");
       sendButton.disabled = true;
@@ -706,8 +844,41 @@
       }
     }
 
+    async function askCsv(file) {
+      appendMessage("user", `CSV: ${file.name}`);
+      setStatus("Working");
+      sendButton.disabled = true;
+
+      try {
+        const csv = await file.text();
+        const payload = await api("/api/diagnose_history", {
+          method: "POST",
+          body: JSON.stringify({csv, filename: file.name})
+        });
+        appendMessage("assistant", renderAnswer(payload));
+        setStatus("Ready");
+      } catch (error) {
+        appendMessage("assistant", error.message);
+        setStatus(error.message, true);
+      } finally {
+        sendButton.disabled = false;
+        csvFile.focus();
+      }
+    }
+
     form.addEventListener("submit", (event) => {
       event.preventDefault();
+      if (inputMode === "csv") {
+        const file = csvFile.files[0];
+        if (!file) {
+          setStatus("Select a CSV", true);
+          csvFile.focus();
+          return;
+        }
+        askCsv(file);
+        return;
+      }
+
       const text = prompt.value.trim();
       if (!text) {
         setStatus("Enter a question", true);
@@ -715,7 +886,7 @@
         return;
       }
       prompt.value = "";
-      ask(text);
+      askText(text);
     });
 
     prompt.addEventListener("keydown", (event) => {
@@ -727,8 +898,20 @@
 
     clearButton.addEventListener("click", () => {
       messages.innerHTML = "";
+      prompt.value = "";
+      csvFile.value = "";
+      csvName.textContent = "Select CSV";
       setStatus("Ready");
       prompt.focus();
+    });
+
+    csvFile.addEventListener("change", () => {
+      const file = csvFile.files[0];
+      csvName.textContent = file ? file.name : "Select CSV";
+    });
+
+    modeButtons.forEach((button) => {
+      button.addEventListener("click", () => setMode(button.dataset.mode));
     });
   </script>
 </body>

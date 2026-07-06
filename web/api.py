@@ -74,6 +74,38 @@ def serialize_extraction(extraction: Any | None) -> dict[str, Any] | None:
     }
 
 
+def serialize_training_history(analysis: Any | None) -> dict[str, Any] | None:
+    """Return a JSON-safe metric-history analysis summary."""
+    if analysis is None:
+        return None
+
+    return {
+        "source": analysis.source,
+        "rows": len(analysis.rows),
+        "columns": list(analysis.columns),
+        "all_fact_names": list(analysis.all_fact_names),
+        "root_confidence": dict(analysis.root_confidence),
+        "summary": {
+            metric: {
+                key: round(float(value), 6)
+                for key, value in values.items()
+            }
+            for metric, values in analysis.summary.items()
+        },
+        "warnings": list(analysis.warnings),
+        "evidence": [
+            {
+                "fact_name": item.fact_name,
+                "metric": item.metric,
+                "confidence": item.confidence,
+                "reason": item.reason,
+                "value": item.value,
+            }
+            for item in analysis.evidence
+        ],
+    }
+
+
 def serialize_result(result: DiagnosisResult) -> dict[str, Any]:
     """Return a JSON-safe DiagnosisResult dict."""
     return {
@@ -84,6 +116,7 @@ def serialize_result(result: DiagnosisResult) -> dict[str, Any]:
         "confidence": dict(result.confidence),
         "conflicts": [dict(conflict) for conflict in result.conflicts],
         "extraction": serialize_extraction(result.extraction),
+        "training_history": serialize_training_history(result.training_history),
     }
 
 
@@ -153,6 +186,22 @@ def _diagnose_text(payload: dict[str, Any]) -> DiagnosisResult:
     return DebuggingKnowledgeEngine().run_text(_require_string(payload, "text"))
 
 
+def _diagnose_history(payload: dict[str, Any]) -> DiagnosisResult:
+    csv_text = payload.get("csv", payload.get("content"))
+    if not isinstance(csv_text, str) or not csv_text.strip():
+        raise ApiError(
+            HTTPStatus.BAD_REQUEST,
+            "'csv' must contain non-empty training-history CSV content.",
+        )
+    filename = payload.get("filename", "uploaded CSV")
+    if not isinstance(filename, str) or not filename.strip():
+        filename = "uploaded CSV"
+    return DebuggingKnowledgeEngine().run_training_history_text(
+        csv_text,
+        source=filename.strip(),
+    )
+
+
 def _diagnose_scenario(payload: dict[str, Any]) -> DiagnosisResult:
     session = WhatIfSession()
     session.load_scenario(_require_string(payload, "name"))
@@ -200,6 +249,10 @@ def dispatch_api_request(
 
         if method == "POST" and path == "/api/diagnose_text":
             result = _diagnose_text(_require_object(payload))
+            return HTTPStatus.OK, serialize_result(result)
+
+        if method == "POST" and path == "/api/diagnose_history":
+            result = _diagnose_history(_require_object(payload))
             return HTTPStatus.OK, serialize_result(result)
 
         if method == "POST" and path == "/api/scenario":

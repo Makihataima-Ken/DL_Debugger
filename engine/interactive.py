@@ -150,6 +150,7 @@ class WhatIfSession:
         self._facts: dict[str, None] = {}
         self.root_confidence: dict[str, float] = {}
         self.extraction: Any | None = None
+        self.training_history: Any | None = None
         self.last_result: DiagnosisResult | None = None
 
     def add(self, *fact_names: str) -> list[str]:
@@ -159,6 +160,7 @@ class WhatIfSession:
             self._facts.setdefault(name, None)
             self.root_confidence.setdefault(name, 1.0)
         self.extraction = None
+        self.training_history = None
         return self.current_facts()
 
     def remove(self, *fact_names: str) -> list[str]:
@@ -168,6 +170,7 @@ class WhatIfSession:
             self._facts.pop(name, None)
             self.root_confidence.pop(name, None)
         self.extraction = None
+        self.training_history = None
         return self.current_facts()
 
     def set_from_text(self, text: str) -> Any | None:
@@ -193,7 +196,24 @@ class WhatIfSession:
             for name in fact_names
         }
         self.extraction = extraction
+        self.training_history = None
         return extraction
+
+    def set_from_training_history_csv(self, path: str) -> Any | None:
+        """Populate session facts from a training-history CSV file."""
+        result = self.engine.run_training_history_csv(path)
+        analysis = result.training_history
+        fact_names = analysis.all_fact_names if analysis is not None else []
+
+        self._facts = _ordered_unique(fact_names)
+        self.root_confidence = (
+            dict(analysis.root_confidence)
+            if analysis is not None
+            else {}
+        )
+        self.extraction = None
+        self.training_history = analysis
+        return analysis
 
     def load_scenario(self, name: str) -> list[str]:
         """Populate session facts from a built-in scenario name."""
@@ -205,6 +225,7 @@ class WhatIfSession:
         self._facts = _ordered_unique(fact_names)
         self.root_confidence = {fact_name: 1.0 for fact_name in fact_names}
         self.extraction = None
+        self.training_history = None
         return self.current_facts()
 
     def clear(self) -> None:
@@ -212,6 +233,7 @@ class WhatIfSession:
         self._facts.clear()
         self.root_confidence.clear()
         self.extraction = None
+        self.training_history = None
         self.last_result = None
 
     reset = clear
@@ -231,6 +253,8 @@ class WhatIfSession:
             fact_names,
             root_confidence=root_confidence,
         )
+        if self.training_history is not None:
+            result.training_history = self.training_history
         self.last_result = result
         return result
 

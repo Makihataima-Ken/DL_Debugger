@@ -134,6 +134,24 @@ def test_api_diagnose_text_includes_nlp_extraction_summary():
     assert body["extraction"]["evidence"]
 
 
+def test_api_diagnose_history_includes_metric_evidence():
+    csv_text = Path("training_history.csv").read_text(encoding="utf-8")
+
+    status, body = dispatch_api_request(
+        "POST",
+        "/api/diagnose_history",
+        {"csv": csv_text, "filename": "training_history.csv"},
+    )
+
+    assert status == HTTPStatus.OK
+    assert "LearningRateTooHigh" in body["causes"]
+    assert "OscillatingLoss" in body["symptoms"]
+    assert body["training_history"]["source"] == "training_history.csv"
+    assert "OscillatingLoss" in body["training_history"]["all_fact_names"]
+    assert body["training_history"]["evidence"]
+    assert body["extraction"] is None
+
+
 def test_api_diagnose_text_exposes_user_stated_cause_facts():
     status, body = dispatch_api_request(
         "POST",

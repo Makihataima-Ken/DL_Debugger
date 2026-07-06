@@ -10,6 +10,7 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING
 from collections import defaultdict
+from pathlib import Path
 
 from experta import KnowledgeEngine, DefFacts, Fact
 
@@ -694,6 +695,42 @@ class DebuggingKnowledgeEngine(
         result.extraction = extraction
         return result
 
+    def run_training_history_csv(self, path: str | Path) -> "DiagnosisResult":
+        """CSV metric-history entry point.
+
+        The metrics adapter converts observed training-history patterns into
+        existing symptom Fact names and root confidences. It performs no root
+        cause diagnosis; all causes and recommendations still come from the
+        Experta rule set.
+        """
+        from engine.metrics.training_history_analyzer import (
+            analyze_training_history_csv,
+        )
+
+        analysis = analyze_training_history_csv(path)
+        return self._run_training_history_analysis(analysis)
+
+    def run_training_history_text(
+        self,
+        csv_text: str,
+        source: str = "uploaded CSV",
+    ) -> "DiagnosisResult":
+        """CSV content entry point for API/browser uploads."""
+        from engine.metrics.training_history_analyzer import (
+            analyze_training_history_text,
+        )
+
+        analysis = analyze_training_history_text(csv_text, source=source)
+        return self._run_training_history_analysis(analysis)
+
+    def _run_training_history_analysis(self, analysis) -> "DiagnosisResult":
+        result = self.run_scenario(
+            analysis.all_fact_names,
+            root_confidence=analysis.root_confidence,
+        )
+        result.training_history = analysis
+        return result
+
 
 # ---------------------------------------------------------------------------
 # Result container
@@ -738,6 +775,8 @@ class DiagnosisResult:
         self.conflicts = conflicts or []
         # Optional NLP provenance (set by run_text); None for symptom-only runs.
         self.extraction = None
+        # Optional metric provenance (set by run_training_history_*).
+        self.training_history = None
 
     def __repr__(self) -> str:  # pragma: no cover
         return (
