@@ -229,6 +229,9 @@ def dispatch_api_request(
 ) -> tuple[int, dict[str, Any]]:
     """Dispatch one JSON API request and return (status, JSON body)."""
     method = method.upper()
+    path = path.strip()
+    if path != "/":
+        path = path.rstrip("/")
 
     try:
         if method == "GET" and path == "/api/facts":
@@ -258,7 +261,11 @@ def dispatch_api_request(
             result = _diagnose_text(_require_object(payload))
             return HTTPStatus.OK, serialize_result(result)
 
-        if method == "POST" and path == "/api/diagnose_history":
+        if method == "POST" and path in {
+            "/api/diagnose_history",
+            "/api/diagnose_csv",
+            "/api/history",
+        }:
             result = _diagnose_history(_require_object(payload))
             return HTTPStatus.OK, serialize_result(result)
 
