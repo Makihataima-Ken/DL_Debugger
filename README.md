@@ -1,6 +1,6 @@
 # Knowledge-Based Expert System for Systematic Debugging of Deep Learning Model Outputs
 
-A hybrid **NLP-powered, explainable, knowledge-based expert system** that helps AI students and developers diagnose problems in deep learning model training, validation, and testing. Users describe problems in **plain English**; an NLP layer converts the text into Experta facts, and **all reasoning still emerges exclusively from Experta rule activation** — no procedural decision logic exists outside rules.
+A hybrid **NLP-powered, explainable, knowledge-based expert system** that helps AI students and developers diagnose problems in deep learning model training, validation, and testing. Users can describe problems in **plain English**, choose predefined scenarios, or provide a CSV training history; input adapters convert those signals into Experta facts, and **all reasoning still emerges exclusively from Experta rule activation** — no procedural decision logic exists outside rules.
 
 ---
 
@@ -100,6 +100,20 @@ Phrase matching uses spaCy's tokenizer, lemmatizer, and `PhraseMatcher(attr="LEM
 Negation handling uses spaCy sentence boundaries and dependency parses instead of a fixed token window. Cues such as `no`, `not`, `without`, `no sign of`, `free of`, and `rather than` suppress only matches in the same clause, so `no overfitting, but the loss oscillates` negates overfitting without suppressing oscillating loss. Curated positive phrases that intentionally contain `not`, such as `loss not decreasing`, `not a number`, `not much data`, and `early layers not learning`, are protected so they still emit their intended facts.
 
 Hedged language such as `maybe`, `might be`, `possibly`, and `seems like` lowers lexical evidence confidence without changing rule confidences.
+
+---
+
+### Training-History CSV Adapter
+
+The CSV adapter reads epoch-level metrics and emits existing observable symptom facts such as `TrainingLossHigh`, `ValidationLossHigh`, `TrainingAccuracyLow`, `ValidationAccuracyLow`, `TrainingAccuracyHigh`, `ValidationAccuracyHigh`, `OscillatingLoss`, `SlowConvergence`, and `NaNLoss`. It does not assert root causes directly; the standard Experta rules still derive causes, recommendations, explanations, conflicts, and confidence.
+
+Required columns:
+
+```csv
+epoch,train_loss,val_loss,train_accuracy,val_accuracy,learning_rate
+```
+
+The adapter keeps metric evidence and root confidence alongside the diagnosis so CLI/API/UI callers can show why each metric-derived fact was injected.
 
 ---
 
@@ -540,6 +554,20 @@ python main.py symptoms=UsesMixedPrecision,NaNLoss
 python main.py symptoms=ModelIsTransformer,LongSequenceMemoryBlowup
 ```
 
+### Training-History CSV
+
+```bash
+python main.py --history-csv training_history.csv
+python main.py --history-csv training_history2.csv
+```
+
+CSV input uses this schema:
+
+```csv
+epoch,train_loss,val_loss,train_accuracy,val_accuracy,learning_rate
+1,1.2,1.25,0.5,0.48,0.1
+```
+
 ### Interactive What-If Mode
 
 Launch the presentation-only REPL:
@@ -549,7 +577,7 @@ python main.py -i
 python main.py --interactive
 ```
 
-All reasoning still happens inside Experta rules. The interactive layer only edits the input fact set, calls `run_scenario()` or `run_text()`, and compares two `DiagnosisResult` objects.
+All reasoning still happens inside Experta rules. The interactive layer only edits the input fact set, calls `run_scenario()`, `run_text()`, or `run_training_history_csv()`, and compares two `DiagnosisResult` objects.
 
 Commands:
 
@@ -560,6 +588,7 @@ Commands:
 | `add <FactName...>` | `add TrainingLossHigh OscillatingLoss` |
 | `remove <FactName...>` | `remove SlowConvergence` |
 | `text <description>` | `text training loss high and loss oscillates` |
+| `history <csv-path>` | `history training_history.csv` |
 | `scenario <name>` | `scenario overfitting` |
 | `diagnose` / `run` | `diagnose` |
 | `whatif add <FactName...>` | `whatif add SmallDataset` |
@@ -592,9 +621,9 @@ python main.py --serve
 python main.py --serve --host 127.0.0.1 --port 8000
 ```
 
-Then open `http://127.0.0.1:8000/`. The browser UI is a free-text chatbot: ask a training/debugging question, and it renders the rule-backed answer, recommendations, explanations, confidence, conflicts, and NLP extraction evidence returned by `/api/diagnose_text`.
+Then open `http://127.0.0.1:8000/`. The browser UI supports free-text diagnosis and CSV training-history upload. It renders the rule-backed answer, recommendations, explanations, confidence, conflicts, and either NLP extraction evidence or metric evidence.
 
-Predefined scenarios and what-if diagnosis are currently terminal-first workflows through `python main.py --scenario ...` and `python main.py --interactive`. The legacy API endpoints are still present for tests and direct integrations, but the browser only uses free-text diagnosis.
+Predefined scenarios and what-if diagnosis are currently terminal-first workflows through `python main.py --scenario ...` and `python main.py --interactive`. The legacy API endpoints are still present for tests and direct integrations.
 
 API endpoints:
 
@@ -602,8 +631,10 @@ API endpoints:
 |---|---|---|---|
 | `GET` | `/api/facts` | - | `{"facts": [...]}` |
 | `GET` | `/api/scenarios` | - | `{"scenarios": [...], "definitions": {...}}` |
+| `GET` | `/api/problem_options` | - | `{"categories": [...], "problems": [...]}` |
 | `POST` | `/api/diagnose` | `{"symptoms": ["TrainingLossHigh"]}` | serialized `DiagnosisResult` |
 | `POST` | `/api/diagnose_text` | `{"text": "training loss oscillates"}` | serialized `DiagnosisResult` with extraction summary |
+| `POST` | `/api/diagnose_history` | `{"csv": "...", "filename": "training_history.csv"}` | serialized `DiagnosisResult` with metric evidence |
 | `POST` | `/api/scenario` | `{"name": "overfitting"}` | serialized `DiagnosisResult` |
 | `POST` | `/api/whatif` | `{"base": {"facts": [...]}, "action": "add", "facts": [...]}` | `{"result": ..., "diff": ...}` |
 

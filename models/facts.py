@@ -12,6 +12,7 @@ Fact
 └── Explanation facts – audit trail for XAI
 """
 
+from utils import experta_compat  # noqa: F401
 from experta import Fact, Field
 
 

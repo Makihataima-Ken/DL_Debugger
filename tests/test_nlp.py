@@ -203,6 +203,10 @@ class TestReportedPromptVocabulary:
                 "batch norm stats are desynchronized across GPUs",
                 {"BatchNormDesync", "UsesDistributedTraining"},
             ),
+            (
+                "my transformer attention collapses and outputs repetitive text",
+                {"ModelIsTransformer", "AttentionCollapse", "RepetitiveGeneration"},
+            ),
         ],
     )
     def test_reported_prompt_phrases_extract_expected_facts(self, text, expected):

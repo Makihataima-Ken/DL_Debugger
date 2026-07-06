@@ -14,6 +14,7 @@ Usage
     python main.py --list
     python main.py --symptoms TrainingLossHigh,OscillatingLoss
     python main.py --text "my training loss keeps oscillating and never converges"
+    python main.py --history-csv training_history.csv
 """
 
 from __future__ import annotations
@@ -180,6 +181,25 @@ def _print_extraction(extraction, output_stream: TextIO) -> None:
         print(format_section("NEGATED TERMS", negated_lines), file=output_stream)
 
 
+def _print_training_history_analysis(analysis, output_stream: TextIO) -> None:
+    """Print CSV metric extraction provenance."""
+    if analysis is None:
+        print("[INFO] No metric analysis provenance returned.", file=output_stream)
+        return
+
+    fact_lines = [
+        (
+            f"{normalise_fact_name(evidence.fact_name)} from "
+            f"{evidence.metric} (confidence {evidence.confidence:.3f})"
+        )
+        for evidence in analysis.evidence
+    ]
+    print(format_section("METRIC-DERIVED FACTS", fact_lines), file=output_stream)
+
+    if analysis.warnings:
+        print(format_section("CSV WARNINGS", analysis.warnings), file=output_stream)
+
+
 def _print_diff(diff: DiagnosisDiff, output_stream: TextIO) -> None:
     """Print a structured what-if diff."""
     if not diff.has_changes:
@@ -247,6 +267,7 @@ def _print_repl_help(output_stream: TextIO) -> None:
         "add <FactName...> - add facts to the current set",
         "remove <FactName...> - remove facts from the current set",
         "text <description> - replace facts from NLP extraction",
+        "history <csv-path> - replace facts from training-history CSV",
         "scenario <name> - load a built-in scenario",
         "diagnose / run - run the current fact set",
         "whatif add <FactName...> - apply, rerun, and diff vs baseline",
@@ -326,6 +347,14 @@ def _run_interactive(
                     continue
                 extraction = session.set_from_text(rest)
                 _print_extraction(extraction, output_stream)
+                continue
+
+            if command == "history":
+                if not rest:
+                    print("[ERROR] Usage: history <csv-path>", file=output_stream)
+                    continue
+                analysis = session.set_from_training_history_csv(rest)
+                _print_training_history_analysis(analysis, output_stream)
                 continue
 
             if command == "scenario":
@@ -450,6 +479,26 @@ def _run_text(text: str) -> None:
     )
 
 
+def _run_history_csv(path_str: str) -> None:
+    """Metric-history entry point: CSV -> facts -> diagnosis."""
+    engine = DebuggingKnowledgeEngine()
+    try:
+        result = engine.run_training_history_csv(path_str)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"[ERROR] {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    _print_result(
+        scenario_label=f"training-history: {Path(path_str).name}",
+        symptoms=result.symptoms,
+        causes=result.causes,
+        recommendations=result.recommendations,
+        explanations=result.explanations,
+        confidence=result.confidence,
+    )
+    _print_training_history_analysis(result.training_history, sys.stdout)
+
+
 def _list_scenarios() -> None:
     """Print all available built-in scenario names."""
     print(banner("Available Built-in Scenarios"))
@@ -540,6 +589,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Describe the problem in natural language (e.g. 'my training loss oscillates').",
     )
     parser.add_argument(
+        "--history-csv",
+        metavar="PATH",
+        help="Diagnose a CSV training history with epoch/loss/accuracy metrics.",
+    )
+    parser.add_argument(
         "--list",
         action="store_true",
         dest="list_scenarios",
@@ -600,6 +654,10 @@ def main() -> None:
 
     if args.text:
         _run_text(args.text)
+        return
+
+    if args.history_csv:
+        _run_history_csv(args.history_csv)
         return
 
     if args.scenario:

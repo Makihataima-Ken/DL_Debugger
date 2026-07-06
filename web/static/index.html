@@ -28,9 +28,13 @@
       box-sizing: border-box;
     }
 
+    [hidden] {
+      display: none !important;
+    }
+
     html,
     body {
-      min-height: 100%;
+      height: 100%;
     }
 
     body {
@@ -41,19 +45,27 @@
       color: var(--ink);
       font-family: Arial, Helvetica, sans-serif;
       line-height: 1.45;
+      overflow: hidden;
     }
 
     .app {
       display: grid;
-      grid-template-rows: auto 1fr auto;
-      min-height: 100vh;
-      max-width: 1040px;
+      grid-template-areas:
+        "header"
+        "problems"
+        "chat"
+        "composer";
+      grid-template-rows: auto auto minmax(0, 1fr) auto;
+      width: 100%;
+      height: 100vh;
+      height: 100dvh;
       margin: 0 auto;
       padding: 18px;
       gap: 14px;
     }
 
     .topbar {
+      grid-area: header;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -97,7 +109,21 @@
       font-weight: 700;
     }
 
+    .top-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .toggle-problems {
+      min-height: 36px;
+      padding: 0 11px;
+    }
+
     .chat-shell {
+      grid-area: chat;
       min-height: 0;
       background: var(--surface);
       border: 1px solid var(--line);
@@ -105,7 +131,109 @@
       box-shadow: var(--shadow);
       overflow: hidden;
       display: grid;
-      grid-template-rows: 1fr;
+      grid-template-rows: minmax(0, 1fr);
+    }
+
+    .problem-panel {
+      grid-area: problems;
+      display: grid;
+      grid-template-rows: auto auto minmax(0, auto);
+      gap: 10px;
+      min-height: 0;
+      max-height: min(32vh, 310px);
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 10px 28px rgba(30, 41, 59, 0.08);
+      padding: 12px;
+      overflow: hidden;
+    }
+
+    .problem-controls {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) minmax(180px, 240px);
+      gap: 10px;
+      align-items: end;
+    }
+
+    .problem-field {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .problem-field label {
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    .problem-meta {
+      color: var(--muted);
+      font-size: 0.82rem;
+      min-height: 18px;
+    }
+
+    input,
+    select {
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0 11px;
+      color: var(--ink);
+      font: inherit;
+      background: white;
+    }
+
+    .problem-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 8px;
+      min-height: 0;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+
+    .problem-option {
+      display: grid;
+      gap: 5px;
+      align-content: start;
+      min-height: 78px;
+      height: auto;
+      width: 100%;
+      padding: 10px;
+      white-space: normal;
+      text-align: left;
+      color: var(--ink);
+      background: var(--surface-soft);
+      border-color: var(--line);
+      font-weight: 400;
+    }
+
+    .problem-option:hover,
+    .problem-option.active {
+      border-color: var(--brand);
+      background: #edf7f4;
+    }
+
+    .problem-category {
+      color: var(--brand-dark);
+      font-size: 0.75rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .problem-text {
+      overflow-wrap: anywhere;
+    }
+
+    .problem-empty {
+      color: var(--muted);
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: var(--surface-soft);
     }
 
     .messages {
@@ -113,8 +241,8 @@
       flex-direction: column;
       gap: 16px;
       overflow-y: auto;
-      min-height: 420px;
-      max-height: calc(100vh - 190px);
+      min-height: 0;
+      height: 100%;
       padding: 18px;
       scroll-behavior: smooth;
     }
@@ -122,7 +250,7 @@
     .message {
       display: grid;
       gap: 8px;
-      max-width: min(760px, 100%);
+      max-width: min(920px, 100%);
     }
 
     .message.user {
@@ -163,7 +291,7 @@
     .answer {
       display: grid;
       gap: 12px;
-      width: min(760px, 100%);
+      width: min(920px, 100%);
     }
 
     .answer-section {
@@ -272,8 +400,9 @@
     }
 
     .composer {
+      grid-area: composer;
       display: grid;
-      grid-template-columns: 1fr auto auto;
+      grid-template-columns: auto 1fr auto auto;
       gap: 10px;
       align-items: end;
       background: var(--surface);
@@ -281,6 +410,56 @@
       border-radius: 8px;
       box-shadow: 0 10px 28px rgba(30, 41, 59, 0.08);
       padding: 10px;
+    }
+
+    .mode-tabs {
+      display: flex;
+      align-items: stretch;
+      border: 1px solid var(--brand);
+      border-radius: 8px;
+      overflow: hidden;
+      background: white;
+    }
+
+    .mode-tabs button {
+      flex: 1;
+      min-height: 52px;
+      border: 0;
+      border-radius: 0;
+      padding: 0 12px;
+      color: var(--brand-dark);
+      background: white;
+    }
+
+    .mode-tabs button.active {
+      color: white;
+      background: var(--brand);
+    }
+
+    .file-picker {
+      display: flex;
+      align-items: center;
+      min-height: 52px;
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 11px;
+      color: var(--ink);
+      background: white;
+      cursor: pointer;
+      overflow-wrap: anywhere;
+    }
+
+    .file-picker input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .hidden {
+      display: none;
     }
 
     textarea {
@@ -296,6 +475,8 @@
       background: white;
     }
 
+    input:focus,
+    select:focus,
     textarea:focus,
     button:focus {
       outline: 3px solid rgba(15, 118, 110, 0.24);
@@ -340,10 +521,21 @@
         text-align: left;
       }
 
+      .top-actions {
+        width: 100%;
+        justify-content: space-between;
+      }
+
       .messages {
-        min-height: 360px;
-        max-height: calc(100vh - 220px);
         padding: 14px;
+      }
+
+      .problem-controls {
+        grid-template-columns: 1fr;
+      }
+
+      .problem-list {
+        grid-template-columns: 1fr;
       }
 
       .composer {
@@ -352,6 +544,10 @@
 
       button {
         width: 100%;
+      }
+
+      .top-actions button {
+        width: auto;
       }
 
       .evidence-item,
@@ -368,14 +564,49 @@
         <div class="brand-mark" aria-hidden="true">DL</div>
         <h1>DL Debugger Chat</h1>
       </div>
-      <div id="status" class="status">Ready</div>
+      <div class="top-actions">
+        <div id="status" class="status">Ready</div>
+        <button
+          id="toggle-problems"
+          class="secondary toggle-problems"
+          type="button"
+          aria-controls="problem-panel"
+          aria-expanded="true"
+        >Hide problems</button>
+      </div>
     </header>
+
+    <section id="problem-panel" class="problem-panel" aria-label="Known problem picker">
+      <div class="problem-controls">
+        <div class="problem-field">
+          <label for="problem-search">Search known problems</label>
+          <input
+            id="problem-search"
+            type="search"
+            placeholder="Search by loss, validation, transformer, gpu..."
+            autocomplete="off"
+          >
+        </div>
+        <div class="problem-field">
+          <label for="problem-category">Category</label>
+          <select id="problem-category">
+            <option value="">All categories</option>
+          </select>
+        </div>
+      </div>
+      <div id="problem-count" class="problem-meta">Loading problem options</div>
+      <div id="problem-list" class="problem-list" role="listbox" aria-label="Known problems"></div>
+    </section>
 
     <section class="chat-shell" aria-label="Diagnosis chat">
       <div id="messages" class="messages" aria-live="polite"></div>
     </section>
 
     <form id="composer" class="composer">
+      <div class="mode-tabs" role="tablist" aria-label="Input mode">
+        <button class="active" type="button" data-mode="text">Text</button>
+        <button type="button" data-mode="csv">CSV</button>
+      </div>
       <textarea
         id="prompt"
         name="prompt"
@@ -383,6 +614,10 @@
         placeholder="training loss is high and validation accuracy keeps dropping"
         autocomplete="off"
       ></textarea>
+      <label id="csvPicker" class="file-picker hidden">
+        <input id="csvFile" type="file" accept=".csv,text/csv">
+        <span id="csvName">Select CSV</span>
+      </label>
       <button id="send" type="submit">Send</button>
       <button id="clear" class="secondary" type="button">Clear</button>
     </form>
@@ -392,9 +627,27 @@
     const messages = document.getElementById("messages");
     const form = document.getElementById("composer");
     const prompt = document.getElementById("prompt");
+    const problemPanel = document.getElementById("problem-panel");
+    const problemSearch = document.getElementById("problem-search");
+    const problemCategory = document.getElementById("problem-category");
+    const problemCount = document.getElementById("problem-count");
+    const problemList = document.getElementById("problem-list");
+    const toggleProblemsButton = document.getElementById("toggle-problems");
+    
+    const csvPicker = document.getElementById("csvPicker");
+    const csvFile = document.getElementById("csvFile");
+    const csvName = document.getElementById("csvName");
+    
     const sendButton = document.getElementById("send");
     const clearButton = document.getElementById("clear");
     const status = document.getElementById("status");
+    let problemOptions = [];
+    let currentProblemMatches = [];
+    let selectedProblemId = "";
+    let selectedProblemText = "";
+
+    const modeButtons = [...document.querySelectorAll("[data-mode]")];
+    let inputMode = "text";
 
     function label(name) {
       if (!name) {
@@ -439,7 +692,12 @@
         payload.nlp_result ||
         null
       );
-      return {...diagnosis, extraction};
+      const trainingHistory = (
+        diagnosis.training_history ||
+        payload.training_history ||
+        null
+      );
+      return {...diagnosis, extraction, training_history: trainingHistory};
     }
 
     async function api(path, options = {}) {
@@ -452,6 +710,109 @@
         throw new Error(body.error || `Request failed with ${response.status}`);
       }
       return body;
+    }
+
+    function searchable(value) {
+      return String(value || "").trim().toLowerCase();
+    }
+
+    function setProblemPanelVisible(isVisible) {
+      problemPanel.hidden = !isVisible;
+      toggleProblemsButton.textContent = isVisible ? "Hide problems" : "Show problems";
+      toggleProblemsButton.setAttribute("aria-expanded", String(isVisible));
+    }
+
+    function populateProblemCategories(categories) {
+      problemCategory.innerHTML = "";
+
+      const all = document.createElement("option");
+      all.value = "";
+      all.textContent = "All categories";
+      problemCategory.appendChild(all);
+
+      categories.forEach((category) => {
+        const option = document.createElement("option");
+        option.value = category;
+        option.textContent = category;
+        problemCategory.appendChild(option);
+      });
+    }
+
+    function selectProblem(option) {
+      if (inputMode !== "text") {
+        setMode("text");
+      }
+      selectedProblemId = option.id;
+      selectedProblemText = option.text;
+      prompt.value = option.text;
+      setStatus("Problem selected");
+      renderProblemOptions();
+      prompt.focus();
+    }
+
+    function makeProblemButton(option) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = option.id === selectedProblemId
+        ? "problem-option active"
+        : "problem-option";
+      button.setAttribute("role", "option");
+      button.setAttribute("aria-selected", option.id === selectedProblemId ? "true" : "false");
+
+      const category = document.createElement("span");
+      category.className = "problem-category";
+      category.textContent = option.category;
+
+      const text = document.createElement("span");
+      text.className = "problem-text";
+      text.textContent = option.text;
+
+      button.append(category, text);
+      button.addEventListener("click", () => selectProblem(option));
+      button.addEventListener("dblclick", () => form.requestSubmit());
+      return button;
+    }
+
+    function renderProblemOptions() {
+      const query = searchable(problemSearch.value);
+      const selectedCategory = problemCategory.value;
+
+      currentProblemMatches = problemOptions.filter((option) => {
+        const categoryMatches = !selectedCategory || option.category === selectedCategory;
+        const queryMatches = !query || searchable(`${option.category} ${option.text}`).includes(query);
+        return categoryMatches && queryMatches;
+      });
+
+      problemList.innerHTML = "";
+      problemCount.textContent = `${currentProblemMatches.length} of ${problemOptions.length} problems`;
+
+      if (currentProblemMatches.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "problem-empty";
+        empty.textContent = "No matching problem. Type your own description below.";
+        problemList.appendChild(empty);
+        return;
+      }
+
+      currentProblemMatches.forEach((option) => {
+        problemList.appendChild(makeProblemButton(option));
+      });
+    }
+
+    async function loadProblemOptions() {
+      try {
+        const payload = await api("/api/problem_options");
+        problemOptions = toArray(payload.problems);
+        const categories = toArray(payload.categories).length
+          ? toArray(payload.categories)
+          : [...new Set(problemOptions.map((option) => option.category))];
+
+        populateProblemCategories(categories);
+        renderProblemOptions();
+      } catch (error) {
+        problemCount.textContent = "Problem options are unavailable. You can still type below.";
+        problemList.innerHTML = "";
+      }
     }
 
     function toArray(value) {
@@ -535,6 +896,10 @@
     }
 
     function renderExtraction(result) {
+      if (!result.extraction) {
+        return null;
+      }
+
       const extraction = result.extraction || {};
       const section = makeSection("NLP Evidence");
       const facts = (
@@ -577,6 +942,53 @@
       if (negated.length > 0) {
         const negatedFacts = negated.map((item) => item.fact_name || item);
         section.appendChild(renderChips(negatedFacts, "warn"));
+      }
+
+      return section;
+    }
+
+    function renderTrainingHistory(result) {
+      const analysis = result.training_history;
+      if (!analysis) {
+        return null;
+      }
+
+      const section = makeSection("Metric Evidence");
+      section.appendChild(renderChips(toArray(analysis.all_fact_names), ""));
+
+      const evidence = toArray(analysis.evidence);
+      if (evidence.length > 0) {
+        const grid = document.createElement("div");
+        grid.className = "evidence-grid";
+
+        evidence.forEach((item) => {
+          const row = document.createElement("div");
+          row.className = "evidence-item";
+
+          const left = document.createElement("div");
+          left.textContent = `${label(item.fact_name)} from ${item.metric || "metrics"}`;
+
+          const right = document.createElement("div");
+          right.className = "muted";
+          right.textContent = score(item.confidence).toFixed(3);
+
+          row.append(left, right);
+          grid.appendChild(row);
+        });
+
+        section.appendChild(grid);
+      }
+
+      const warnings = toArray(analysis.warnings);
+      if (warnings.length > 0) {
+        const list = document.createElement("ul");
+        list.className = "list";
+        warnings.forEach((warning) => {
+          const item = document.createElement("li");
+          item.textContent = warning;
+          list.appendChild(item);
+        });
+        section.appendChild(list);
       }
 
       return section;
@@ -676,6 +1088,7 @@
         renderSummary(result),
         renderDiagnosis(result),
         renderRecommendations(result),
+        renderTrainingHistory(result),
         renderExtraction(result),
         renderConfidence(result),
         renderConflicts(result),
@@ -685,7 +1098,21 @@
       return root;
     }
 
-    async function ask(text) {
+    function setMode(mode) {
+      inputMode = mode;
+      modeButtons.forEach((button) => {
+        button.classList.toggle("active", button.dataset.mode === mode);
+      });
+      prompt.classList.toggle("hidden", mode !== "text");
+      csvPicker.classList.toggle("hidden", mode !== "csv");
+      if (mode === "text") {
+        prompt.focus();
+      } else {
+        csvFile.focus();
+      }
+    }
+
+    async function askText(text) {
       appendMessage("user", text);
       setStatus("Working");
       sendButton.disabled = true;
@@ -706,8 +1133,47 @@
       }
     }
 
+    async function askCsv(file) {
+      appendMessage("user", `CSV: ${file.name}`);
+      setStatus("Working");
+      sendButton.disabled = true;
+
+      try {
+        const csv = await file.text();
+        const payload = await api("/api/diagnose_history", {
+          method: "POST",
+          body: JSON.stringify({csv, filename: file.name})
+        });
+        appendMessage("assistant", renderAnswer(payload));
+        setStatus("Ready");
+      } catch (error) {
+        const message = String(error.message || "");
+        const csvEndpointMissing = message.includes("Unknown endpoint")
+          && message.includes("diagnose_history");
+        const displayMessage = csvEndpointMissing
+          ? "CSV diagnosis endpoint is not available in the running server. Restart the web server so it loads the merged API code."
+          : message;
+        appendMessage("assistant", displayMessage);
+        setStatus(displayMessage, true);
+      } finally {
+        sendButton.disabled = false;
+        csvFile.focus();
+      }
+    }
+
     form.addEventListener("submit", (event) => {
       event.preventDefault();
+      if (inputMode === "csv") {
+        const file = csvFile.files[0];
+        if (!file) {
+          setStatus("Select a CSV", true);
+          csvFile.focus();
+          return;
+        }
+        askCsv(file);
+        return;
+      }
+
       const text = prompt.value.trim();
       if (!text) {
         setStatus("Enter a question", true);
@@ -715,7 +1181,31 @@
         return;
       }
       prompt.value = "";
-      ask(text);
+      selectedProblemId = "";
+      selectedProblemText = "";
+      renderProblemOptions();
+      askText(text);
+    });
+
+    problemSearch.addEventListener("input", renderProblemOptions);
+    problemCategory.addEventListener("change", renderProblemOptions);
+    toggleProblemsButton.addEventListener("click", () => {
+      setProblemPanelVisible(problemPanel.hidden);
+    });
+
+    problemSearch.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && currentProblemMatches.length > 0) {
+        event.preventDefault();
+        selectProblem(currentProblemMatches[0]);
+      }
+    });
+
+    prompt.addEventListener("input", () => {
+      if (selectedProblemId && prompt.value !== selectedProblemText) {
+        selectedProblemId = "";
+        selectedProblemText = "";
+        renderProblemOptions();
+      }
     });
 
     prompt.addEventListener("keydown", (event) => {
@@ -727,8 +1217,31 @@
 
     clearButton.addEventListener("click", () => {
       messages.innerHTML = "";
+      selectedProblemId = "";
+      selectedProblemText = "";
+      prompt.value = "";
+      csvFile.value = "";
+      csvName.textContent = "Select CSV";
+      problemSearch.value = "";
+      problemCategory.value = "";
+      renderProblemOptions();
       setStatus("Ready");
-      prompt.focus();
+      if (inputMode === "csv") {
+        csvFile.focus();
+      } else {
+        prompt.focus();
+      }
+    });
+
+    loadProblemOptions();
+
+    csvFile.addEventListener("change", () => {
+      const file = csvFile.files[0];
+      csvName.textContent = file ? file.name : "Select CSV";
+    });
+
+    modeButtons.forEach((button) => {
+      button.addEventListener("click", () => setMode(button.dataset.mode));
     });
   </script>
 </body>
