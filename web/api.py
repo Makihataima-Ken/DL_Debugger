@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from data.problem_catalog import get_problem_categories, get_problem_options
 from data.scenario_loader import BUILTIN_SCENARIOS
 from engine.interactive import (
     DiagnosisDiff,
@@ -241,6 +242,12 @@ def dispatch_api_request(
                     name: list(facts)
                     for name, facts in sorted(BUILTIN_SCENARIOS.items())
                 },
+            }
+
+        if method == "GET" and path == "/api/problem_options":
+            return HTTPStatus.OK, {
+                "categories": get_problem_categories(),
+                "problems": get_problem_options(),
             }
 
         if method == "POST" and path == "/api/diagnose":

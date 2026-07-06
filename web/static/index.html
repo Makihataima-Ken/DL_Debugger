@@ -28,6 +28,10 @@
       box-sizing: border-box;
     }
 
+    [hidden] {
+      display: none !important;
+    }
+
     html,
     body {
       min-height: 100%;
@@ -97,6 +101,19 @@
       font-weight: 700;
     }
 
+    .top-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .toggle-problems {
+      min-height: 36px;
+      padding: 0 11px;
+    }
+
     .chat-shell {
       min-height: 0;
       background: var(--surface);
@@ -108,13 +125,110 @@
       grid-template-rows: 1fr;
     }
 
+    .problem-panel {
+      display: grid;
+      gap: 10px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 10px 28px rgba(30, 41, 59, 0.08);
+      padding: 12px;
+    }
+
+    .problem-controls {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) minmax(180px, 240px);
+      gap: 10px;
+      align-items: end;
+    }
+
+    .problem-field {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .problem-field label {
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    .problem-meta {
+      color: var(--muted);
+      font-size: 0.82rem;
+      min-height: 18px;
+    }
+
+    input,
+    select {
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0 11px;
+      color: var(--ink);
+      font: inherit;
+      background: white;
+    }
+
+    .problem-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 8px;
+      max-height: 220px;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+
+    .problem-option {
+      display: grid;
+      gap: 5px;
+      align-content: start;
+      min-height: 78px;
+      height: auto;
+      width: 100%;
+      padding: 10px;
+      white-space: normal;
+      text-align: left;
+      color: var(--ink);
+      background: var(--surface-soft);
+      border-color: var(--line);
+      font-weight: 400;
+    }
+
+    .problem-option:hover,
+    .problem-option.active {
+      border-color: var(--brand);
+      background: #edf7f4;
+    }
+
+    .problem-category {
+      color: var(--brand-dark);
+      font-size: 0.75rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .problem-text {
+      overflow-wrap: anywhere;
+    }
+
+    .problem-empty {
+      color: var(--muted);
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: var(--surface-soft);
+    }
+
     .messages {
       display: flex;
       flex-direction: column;
       gap: 16px;
       overflow-y: auto;
-      min-height: 420px;
-      max-height: calc(100vh - 190px);
+      min-height: 320px;
+      max-height: clamp(320px, calc(100vh - 430px), 520px);
       padding: 18px;
       scroll-behavior: smooth;
     }
@@ -346,6 +460,8 @@
       background: white;
     }
 
+    input:focus,
+    select:focus,
     textarea:focus,
     button:focus {
       outline: 3px solid rgba(15, 118, 110, 0.24);
@@ -390,10 +506,24 @@
         text-align: left;
       }
 
+      .top-actions {
+        width: 100%;
+        justify-content: space-between;
+      }
+
       .messages {
-        min-height: 360px;
-        max-height: calc(100vh - 220px);
+        min-height: 300px;
+        max-height: clamp(300px, calc(100vh - 520px), 420px);
         padding: 14px;
+      }
+
+      .problem-controls {
+        grid-template-columns: 1fr;
+      }
+
+      .problem-list {
+        grid-template-columns: 1fr;
+        max-height: 260px;
       }
 
       .composer {
@@ -404,7 +534,7 @@
         width: 100%;
       }
 
-      .mode-tabs button {
+      .top-actions button {
         width: auto;
       }
 
@@ -422,8 +552,39 @@
         <div class="brand-mark" aria-hidden="true">DL</div>
         <h1>DL Debugger Chat</h1>
       </div>
-      <div id="status" class="status">Ready</div>
+      <div class="top-actions">
+        <div id="status" class="status">Ready</div>
+        <button
+          id="toggle-problems"
+          class="secondary toggle-problems"
+          type="button"
+          aria-controls="problem-panel"
+          aria-expanded="true"
+        >Hide problems</button>
+      </div>
     </header>
+
+    <section id="problem-panel" class="problem-panel" aria-label="Known problem picker">
+      <div class="problem-controls">
+        <div class="problem-field">
+          <label for="problem-search">Search known problems</label>
+          <input
+            id="problem-search"
+            type="search"
+            placeholder="Search by loss, validation, transformer, gpu..."
+            autocomplete="off"
+          >
+        </div>
+        <div class="problem-field">
+          <label for="problem-category">Category</label>
+          <select id="problem-category">
+            <option value="">All categories</option>
+          </select>
+        </div>
+      </div>
+      <div id="problem-count" class="problem-meta">Loading problem options</div>
+      <div id="problem-list" class="problem-list" role="listbox" aria-label="Known problems"></div>
+    </section>
 
     <section class="chat-shell" aria-label="Diagnosis chat">
       <div id="messages" class="messages" aria-live="polite"></div>
@@ -454,12 +615,25 @@
     const messages = document.getElementById("messages");
     const form = document.getElementById("composer");
     const prompt = document.getElementById("prompt");
+    const problemPanel = document.getElementById("problem-panel");
+    const problemSearch = document.getElementById("problem-search");
+    const problemCategory = document.getElementById("problem-category");
+    const problemCount = document.getElementById("problem-count");
+    const problemList = document.getElementById("problem-list");
+    const toggleProblemsButton = document.getElementById("toggle-problems");
+    
     const csvPicker = document.getElementById("csvPicker");
     const csvFile = document.getElementById("csvFile");
     const csvName = document.getElementById("csvName");
+    
     const sendButton = document.getElementById("send");
     const clearButton = document.getElementById("clear");
     const status = document.getElementById("status");
+    let problemOptions = [];
+    let currentProblemMatches = [];
+    let selectedProblemId = "";
+    let selectedProblemText = "";
+
     const modeButtons = [...document.querySelectorAll("[data-mode]")];
     let inputMode = "text";
 
@@ -524,6 +698,106 @@
         throw new Error(body.error || `Request failed with ${response.status}`);
       }
       return body;
+    }
+
+    function searchable(value) {
+      return String(value || "").trim().toLowerCase();
+    }
+
+    function setProblemPanelVisible(isVisible) {
+      problemPanel.hidden = !isVisible;
+      toggleProblemsButton.textContent = isVisible ? "Hide problems" : "Show problems";
+      toggleProblemsButton.setAttribute("aria-expanded", String(isVisible));
+    }
+
+    function populateProblemCategories(categories) {
+      problemCategory.innerHTML = "";
+
+      const all = document.createElement("option");
+      all.value = "";
+      all.textContent = "All categories";
+      problemCategory.appendChild(all);
+
+      categories.forEach((category) => {
+        const option = document.createElement("option");
+        option.value = category;
+        option.textContent = category;
+        problemCategory.appendChild(option);
+      });
+    }
+
+    function selectProblem(option) {
+      selectedProblemId = option.id;
+      selectedProblemText = option.text;
+      prompt.value = option.text;
+      setStatus("Problem selected");
+      renderProblemOptions();
+      prompt.focus();
+    }
+
+    function makeProblemButton(option) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = option.id === selectedProblemId
+        ? "problem-option active"
+        : "problem-option";
+      button.setAttribute("role", "option");
+      button.setAttribute("aria-selected", option.id === selectedProblemId ? "true" : "false");
+
+      const category = document.createElement("span");
+      category.className = "problem-category";
+      category.textContent = option.category;
+
+      const text = document.createElement("span");
+      text.className = "problem-text";
+      text.textContent = option.text;
+
+      button.append(category, text);
+      button.addEventListener("click", () => selectProblem(option));
+      button.addEventListener("dblclick", () => form.requestSubmit());
+      return button;
+    }
+
+    function renderProblemOptions() {
+      const query = searchable(problemSearch.value);
+      const selectedCategory = problemCategory.value;
+
+      currentProblemMatches = problemOptions.filter((option) => {
+        const categoryMatches = !selectedCategory || option.category === selectedCategory;
+        const queryMatches = !query || searchable(`${option.category} ${option.text}`).includes(query);
+        return categoryMatches && queryMatches;
+      });
+
+      problemList.innerHTML = "";
+      problemCount.textContent = `${currentProblemMatches.length} of ${problemOptions.length} problems`;
+
+      if (currentProblemMatches.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "problem-empty";
+        empty.textContent = "No matching problem. Type your own description below.";
+        problemList.appendChild(empty);
+        return;
+      }
+
+      currentProblemMatches.forEach((option) => {
+        problemList.appendChild(makeProblemButton(option));
+      });
+    }
+
+    async function loadProblemOptions() {
+      try {
+        const payload = await api("/api/problem_options");
+        problemOptions = toArray(payload.problems);
+        const categories = toArray(payload.categories).length
+          ? toArray(payload.categories)
+          : [...new Set(problemOptions.map((option) => option.category))];
+
+        populateProblemCategories(categories);
+        renderProblemOptions();
+      } catch (error) {
+        problemCount.textContent = "Problem options are unavailable. You can still type below.";
+        problemList.innerHTML = "";
+      }
     }
 
     function toArray(value) {
@@ -886,7 +1160,31 @@
         return;
       }
       prompt.value = "";
-      askText(text);
+      selectedProblemId = "";
+      selectedProblemText = "";
+      renderProblemOptions();
+      ask(text);
+    });
+
+    problemSearch.addEventListener("input", renderProblemOptions);
+    problemCategory.addEventListener("change", renderProblemOptions);
+    toggleProblemsButton.addEventListener("click", () => {
+      setProblemPanelVisible(problemPanel.hidden);
+    });
+
+    problemSearch.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && currentProblemMatches.length > 0) {
+        event.preventDefault();
+        selectProblem(currentProblemMatches[0]);
+      }
+    });
+
+    prompt.addEventListener("input", () => {
+      if (selectedProblemId && prompt.value !== selectedProblemText) {
+        selectedProblemId = "";
+        selectedProblemText = "";
+        renderProblemOptions();
+      }
     });
 
     prompt.addEventListener("keydown", (event) => {
@@ -895,6 +1193,20 @@
         form.requestSubmit();
       }
     });
+
+    clearButton.addEventListener("click", () => {
+      messages.innerHTML = "";
+      selectedProblemId = "";
+      selectedProblemText = "";
+      prompt.value = "";
+      problemSearch.value = "";
+      problemCategory.value = "";
+      renderProblemOptions();
+      setStatus("Ready");
+      prompt.focus();
+    });
+
+    loadProblemOptions();
 
     clearButton.addEventListener("click", () => {
       messages.innerHTML = "";

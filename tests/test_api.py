@@ -13,6 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from data.problem_catalog import get_problem_options
 from data.scenario_loader import get_builtin_symptoms
 from engine.interactive import diff_diagnoses
 from engine.knowledge_engine import DebuggingKnowledgeEngine
@@ -104,6 +105,21 @@ def test_api_facts_and_scenarios_are_json_roundtrippable():
     assert scenarios_status == HTTPStatus.OK
     assert "TrainingLossHigh" in roundtrip(facts_body)["facts"]
     assert "overfitting" in roundtrip(scenarios_body)["scenarios"]
+
+
+def test_api_problem_options_are_json_roundtrippable():
+    status, body = dispatch_api_request("GET", "/api/problem_options")
+    payload = roundtrip(body)
+    problems = payload["problems"]
+
+    assert status == HTTPStatus.OK
+    assert payload["categories"][0] == "Quick Examples"
+    assert problems == get_problem_options()
+    assert len({problem["id"] for problem in problems}) == len(problems)
+    assert any(
+        problem["text"] == "multi gpu training throughput is low and the gpus are idle"
+        for problem in problems
+    )
 
 
 def test_serialize_diagnosis_result_is_json_roundtrippable():

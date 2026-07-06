@@ -631,6 +631,7 @@ API endpoints:
 |---|---|---|---|
 | `GET` | `/api/facts` | - | `{"facts": [...]}` |
 | `GET` | `/api/scenarios` | - | `{"scenarios": [...], "definitions": {...}}` |
+| `GET` | `/api/problem_options` | - | `{"categories": [...], "problems": [...]}` |
 | `POST` | `/api/diagnose` | `{"symptoms": ["TrainingLossHigh"]}` | serialized `DiagnosisResult` |
 | `POST` | `/api/diagnose_text` | `{"text": "training loss oscillates"}` | serialized `DiagnosisResult` with extraction summary |
 | `POST` | `/api/diagnose_history` | `{"csv": "...", "filename": "training_history.csv"}` | serialized `DiagnosisResult` with metric evidence |
