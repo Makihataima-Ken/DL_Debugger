@@ -28,6 +28,10 @@
       box-sizing: border-box;
     }
 
+    [hidden] {
+      display: none !important;
+    }
+
     html,
     body {
       min-height: 100%;
@@ -95,6 +99,19 @@
     .status.error {
       color: var(--danger);
       font-weight: 700;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .toggle-problems {
+      min-height: 36px;
+      padding: 0 11px;
     }
 
     .chat-shell {
@@ -439,6 +456,11 @@
         text-align: left;
       }
 
+      .top-actions {
+        width: 100%;
+        justify-content: space-between;
+      }
+
       .messages {
         min-height: 300px;
         max-height: clamp(300px, calc(100vh - 520px), 420px);
@@ -462,6 +484,10 @@
         width: 100%;
       }
 
+      .top-actions button {
+        width: auto;
+      }
+
       .evidence-item,
       .confidence-item {
         grid-template-columns: 1fr;
@@ -476,10 +502,19 @@
         <div class="brand-mark" aria-hidden="true">DL</div>
         <h1>DL Debugger Chat</h1>
       </div>
-      <div id="status" class="status">Ready</div>
+      <div class="top-actions">
+        <div id="status" class="status">Ready</div>
+        <button
+          id="toggle-problems"
+          class="secondary toggle-problems"
+          type="button"
+          aria-controls="problem-panel"
+          aria-expanded="true"
+        >Hide problems</button>
+      </div>
     </header>
 
-    <section class="problem-panel" aria-label="Known problem picker">
+    <section id="problem-panel" class="problem-panel" aria-label="Known problem picker">
       <div class="problem-controls">
         <div class="problem-field">
           <label for="problem-search">Search known problems</label>
@@ -522,10 +557,12 @@
     const messages = document.getElementById("messages");
     const form = document.getElementById("composer");
     const prompt = document.getElementById("prompt");
+    const problemPanel = document.getElementById("problem-panel");
     const problemSearch = document.getElementById("problem-search");
     const problemCategory = document.getElementById("problem-category");
     const problemCount = document.getElementById("problem-count");
     const problemList = document.getElementById("problem-list");
+    const toggleProblemsButton = document.getElementById("toggle-problems");
     const sendButton = document.getElementById("send");
     const clearButton = document.getElementById("clear");
     const status = document.getElementById("status");
@@ -594,6 +631,12 @@
 
     function searchable(value) {
       return String(value || "").trim().toLowerCase();
+    }
+
+    function setProblemPanelVisible(isVisible) {
+      problemPanel.hidden = !isVisible;
+      toggleProblemsButton.textContent = isVisible ? "Hide problems" : "Show problems";
+      toggleProblemsButton.setAttribute("aria-expanded", String(isVisible));
     }
 
     function populateProblemCategories(categories) {
@@ -955,6 +998,10 @@
 
     problemSearch.addEventListener("input", renderProblemOptions);
     problemCategory.addEventListener("change", renderProblemOptions);
+    toggleProblemsButton.addEventListener("click", () => {
+      setProblemPanelVisible(problemPanel.hidden);
+    });
+
     problemSearch.addEventListener("keydown", (event) => {
       if (event.key === "Enter" && currentProblemMatches.length > 0) {
         event.preventDefault();
